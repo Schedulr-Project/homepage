@@ -1,8 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Box, CssBaseline, ThemeProvider } from '@mui/material';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
+import Login from './components/Login';
+import Table from './components/timetable/Table';
+import TimetableGenerator from './components/timetable/TimetableGenerator';
 import Footer from './components/Footer';
 import theme from './theme';
 
@@ -20,10 +23,14 @@ function App() {
           }}
         >
           <Header />
-          <Box component="main" sx={{ flexGrow: 1, py: 4 }}>
+          <Box component="main" sx={{ flexGrow: 1 }}>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              {/* Add more routes as needed */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/generator" element={<Table />} />
+              <Route path="/create" element={<TimetableGenerator />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Box>
           <Footer />

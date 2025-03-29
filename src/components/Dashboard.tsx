@@ -1,207 +1,258 @@
-import React, { useState } from 'react';
-import {
-  Container,
-  Typography,
-  Box,
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Container, 
+  Box, 
+  Typography, 
+  Button, 
   FormControl,
   InputLabel,
   Select,
   MenuItem,
+  SelectChangeEvent,
+  Grid,
   Card,
   CardContent,
-  Button,
-  Grid,
-  Paper,
-  Chip,
+  CardActionArea,
+  Divider,
+  Fab,
+  Tooltip
 } from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import AddIcon from '@mui/icons-material/Add';
 import SchoolIcon from '@mui/icons-material/School';
 
-const Dashboard: React.FC = () => {
-  const [selectedBranch, setSelectedBranch] = useState('All');
+const departments = [
+  { id: 'all', name: 'All Departments' },
+  { id: 'cs', name: 'Computer Science' },
+  { id: 'mnc', name: 'Mathematics & Computing' },
+  { id: 'ee', name: 'Electrical Engineering' },
+  { id: 'me', name: 'Mechanical Engineering' },
+  { id: 'ce', name: 'Civil Engineering' }
+];
 
-  const branches = ['All', 'CS', 'MNC', 'EE'];
+interface CourseData {
+  id: number;
+  department: string;
+  courseCode: string;
+  courseName: string;
+  credits: number;
+  professor: string;
+}
 
-  // Mock data for timetables
-  const timetables = [
-    { id: 1, branch: 'CS', name: 'CS Semester 4 Timetable', semester: '4th' },
-    { id: 2, branch: 'MNC', name: 'MNC Semester 4 Timetable', semester: '4th' },
-    { id: 3, branch: 'EE', name: 'EE Semester 4 Timetable', semester: '4th' },
-  ];
+const DepartmentBlock: React.FC<{ name: string, onClick: () => void }> = ({ name, onClick }) => (
+  <Grid item xs={12} sm={6} md={4}>
+    <Card 
+      sx={{ 
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+        '&:hover': {
+          transform: 'translateY(-5px)',
+          boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
+        }
+      }}
+    >
+      <CardActionArea 
+        sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+        onClick={onClick}
+      >
+        <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <CalendarMonthIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h6" component="div" align="center">
+            {name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
+            View timetable
+          </Typography>
+        </CardContent>
+      </CardActionArea>
+    </Card>
+  </Grid>
+);
 
-  const handleBranchChange = (event: any) => {
-    setSelectedBranch(event.target.value);
-  };
-
-  const handleDownload = (timetableId: number) => {
-    // TODO: Implement PDF download functionality
-    console.log(`Downloading timetable ${timetableId}`);
-  };
-
-  // Filter timetables based on selected branch
-  const filteredTimetables = selectedBranch === 'All' 
-    ? timetables 
-    : timetables.filter(timetable => timetable.branch === selectedBranch);
-
+const CourseBlock: React.FC<{ course: CourseData, onClick: () => void }> = ({ course, onClick }) => {
+  // Find department name
+  const deptName = departments.find(d => d.id === course.department)?.name || course.department;
+  
   return (
-    <Container maxWidth="lg">
-      <Paper
-        elevation={0}
-        sx={{
-          p: 4,
-          borderRadius: 4,
-          background: 'rgba(30, 30, 30, 0.8)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(124, 77, 255, 0.1)',
+    <Grid item xs={12} sm={6} md={4}>
+      <Card 
+        sx={{ 
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+          '&:hover': {
+            transform: 'translateY(-5px)',
+            boxShadow: '0 10px 20px rgba(0,0,0,0.2)',
+          }
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-          <SchoolIcon sx={{ mr: 2, fontSize: 40, color: '#b47cff' }} />
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              fontWeight: 800,
-              letterSpacing: '2px',
-              color: '#b47cff',
-              textShadow: '2px 2px 4px rgba(124, 77, 255, 0.3)',
-              position: 'relative',
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                bottom: '-4px',
-                left: 0,
-                width: '100%',
-                height: '4px',
-                background: 'linear-gradient(90deg, #7c4dff, #ff4081)',
-                borderRadius: '2px',
-              },
-            }}
+        <CardActionArea 
+          sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}
+          onClick={onClick}
+        >
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+              <SchoolIcon sx={{ fontSize: 40, color: 'primary.main', mr: 1 }} />
+              <Typography variant="h6" component="div">
+                {course.courseCode}
+              </Typography>
+            </Box>
+            
+            <Typography variant="subtitle1" component="div" align="center" gutterBottom>
+              {course.courseName}
+            </Typography>
+            
+            <Divider sx={{ my: 1.5 }} />
+            
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              <strong>Department:</strong> {deptName}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+              <strong>Professor:</strong> {course.professor}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              <strong>Credits:</strong> {course.credits}
+            </Typography>
+          </CardContent>
+        </CardActionArea>
+      </Card>
+    </Grid>
+  );
+};
+
+const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const [department, setDepartment] = useState('all');
+  const [courses, setCourses] = useState<CourseData[]>([]);
+
+  // Load courses from localStorage
+  useEffect(() => {
+    const savedCourses = JSON.parse(localStorage.getItem('courses') || '[]');
+    setCourses(savedCourses);
+  }, []);
+
+  const handleChange = (event: SelectChangeEvent) => {
+    setDepartment(event.target.value);
+  };
+
+  const handleViewTimetable = (deptId = department) => {
+    navigate(`/generator?dept=${deptId}`);
+  };
+
+  const handleViewCourse = (courseId: number) => {
+    const course = courses.find(c => c.id === courseId);
+    if (course) {
+      navigate(`/generator?dept=${course.department}&code=${course.courseCode}`);
+    }
+  };
+
+  const handleCreateNew = () => {
+    navigate('/create');
+  };
+
+  // Filter departments and courses to display based on selection
+  const departmentsToShow = department === 'all' 
+    ? departments.filter(dept => dept.id !== 'all')
+    : departments.filter(dept => dept.id === department);
+
+  const coursesToShow = department === 'all'
+    ? courses
+    : courses.filter(course => course.department === department);
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 8, position: 'relative' }}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Department Timetables
+        </Typography>
+        <Typography variant="body1" color="text.secondary" paragraph>
+          Select a department to view its timetable or browse all available timetables below.
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 6 }}>
+        <FormControl sx={{ minWidth: 240 }}>
+          <InputLabel id="department-select-label">Department</InputLabel>
+          <Select
+            labelId="department-select-label"
+            id="department-select"
+            value={department}
+            label="Department"
+            onChange={handleChange}
           >
-            Dashboard
+            {departments.map(dept => (
+              <MenuItem key={dept.id} value={dept.id}>{dept.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => handleViewTimetable()}
+          startIcon={<ViewListIcon />}
+          sx={{ height: 'fit-content' }}
+        >
+          View Timetable
+        </Button>
+      </Box>
+
+      {departmentsToShow.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h5" component="h2" gutterBottom>
+            {department === 'all' ? 'All Departments' : 'Selected Department'}
           </Typography>
+          <Grid container spacing={3} sx={{ mt: 2, mb: 6 }}>
+            {departmentsToShow.map(dept => (
+              <DepartmentBlock 
+                key={dept.id} 
+                name={dept.name} 
+                onClick={() => handleViewTimetable(dept.id)}
+              />
+            ))}
+          </Grid>
         </Box>
+      )}
 
-        <Box sx={{ mb: 4 }}>
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Select Branch</InputLabel>
-            <Select
-              value={selectedBranch}
-              label="Select Branch"
-              onChange={handleBranchChange}
-              sx={{
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#7c4dff',
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#b47cff',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#7c4dff',
-                },
-                color: '#fff',
-              }}
-            >
-              {branches.map((branch) => (
-                <MenuItem key={branch} value={branch}>
-                  {branch}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+      {coursesToShow.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h5" component="h2" gutterBottom>
+            {department === 'all' ? 'All Courses' : 'Department Courses'}
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 2 }}>
+            {coursesToShow.map(course => (
+              <CourseBlock 
+                key={course.id} 
+                course={course} 
+                onClick={() => handleViewCourse(course.id)}
+              />
+            ))}
+          </Grid>
         </Box>
-
-        <Grid container spacing={3}>
-          {filteredTimetables.map((timetable) => (
-            <Grid item xs={12} sm={6} md={4} key={timetable.id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  background: '#2d2d2d',
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '4px',
-                    background: 'linear-gradient(45deg, #7c4dff 30%, #ff4081 90%)',
-                  },
-                }}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography
-                    variant="h6"
-                    gutterBottom
-                    sx={{ 
-                      fontWeight: 600,
-                      color: '#fff',
-                    }}
-                  >
-                    {timetable.name}
-                  </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Chip
-                      label={timetable.semester}
-                      color="primary"
-                      size="small"
-                      sx={{ mr: 1 }}
-                    />
-                    <Chip
-                      label={timetable.branch}
-                      color="secondary"
-                      size="small"
-                    />
-                  </Box>
-                  <Button
-                    variant="contained"
-                    startIcon={<DownloadIcon />}
-                    onClick={() => handleDownload(timetable.id)}
-                    fullWidth
-                    sx={{
-                      mt: 2,
-                      position: 'relative',
-                      overflow: 'hidden',
-                      background: 'transparent',
-                      color: '#7c4dff',
-                      border: '2px solid #7c4dff',
-                      '&:hover': {
-                        background: 'transparent',
-                        borderColor: '#ff4081',
-                        color: '#ff4081',
-                        '&::before': {
-                          transform: 'translateX(100%)',
-                        },
-                      },
-                      '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'linear-gradient(45deg, #7c4dff, #ff4081)',
-                        opacity: 0,
-                        transition: 'transform 0.3s ease',
-                        transform: 'translateX(-100%)',
-                        zIndex: -1,
-                      },
-                    }}
-                  >
-                    Download PDF
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Paper>
+      )}
+      
+      {/* Floating action button to create new timetable */}
+      <Tooltip title="Create New Timetable">
+        <Fab 
+          color="primary" 
+          aria-label="add"
+          sx={{ 
+            position: 'fixed', 
+            bottom: 84,  // Adjusted to be above footer
+            right: 24,
+          }}
+          onClick={handleCreateNew}
+        >
+          <AddIcon />
+        </Fab>
+      </Tooltip>
     </Container>
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

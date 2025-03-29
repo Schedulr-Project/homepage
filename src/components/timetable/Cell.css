@@ -1,0 +1,14 @@
+.row {
+  display: flex;
+  margin: 10px;
+}
+
+.col {
+  height: 100px;
+  text-align: center;
+  border: 1px solid;
+  margin-left: 5px;
+  margin-right: 5px;
+  border-radius: 10px;
+  font-size: 1em;
+}

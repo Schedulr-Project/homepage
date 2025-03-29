@@ -2,6 +2,7 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, Button, Box, Container } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AddIcon from '@mui/icons-material/Add';
 
 const Header: React.FC = () => {
   return (
@@ -67,6 +68,21 @@ const Header: React.FC = () => {
             >
               Login
             </Button>
+            <Button 
+              color="inherit"
+              component={RouterLink}
+              to="/create"
+              startIcon={<AddIcon />}
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
+              }}
+            >
+              Create Timetable
+            </Button>
             <Button
               variant="contained"
               color="secondary"
@@ -90,4 +106,4 @@ const Header: React.FC = () => {
   );
 };
 
-export default Header; 
+export default Header;

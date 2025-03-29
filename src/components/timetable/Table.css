@@ -1,0 +1,22 @@
+.table-container {
+  padding: 15px;
+}
+
+.heading {
+  text-align: center;
+  border-radius: 15px;
+  background-color: rgb(244, 125, 74);
+  margin-top: 4px;
+}
+
+.container {
+  border: 2px solid white;
+  margin-top: 20px;
+  backdrop-filter: blur(30px);
+  box-shadow: 0 0 10px rgba(0,0,0,.5);
+  border-radius: 5px;
+}
+
+.toprow div {
+  border: 0;
+}
