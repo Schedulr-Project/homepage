@@ -16,9 +16,11 @@ import {
   FormHelperText,
   Alert,
   Snackbar,
-  Divider
+  Divider,
+  CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { createCourse, Course, generateTimetables } from '../../services/api';
 
 // Same departments as in Dashboard for consistency
 const departments = [
@@ -34,6 +36,7 @@ interface CourseInfo {
   courseName: string;
   credits: number;
   professor: string;
+  students: number; // Added students field
 }
 
 interface FormData {
@@ -51,6 +54,7 @@ interface FormErrors {
     courseName?: string;
     credits?: string;
     professor?: string;
+    students?: string; // Added students field for validation
   }}
 }
 
@@ -58,7 +62,8 @@ const initialCourseInfo: CourseInfo = {
   courseCode: '',
   courseName: '',
   credits: 3,
-  professor: ''
+  professor: '',
+  students: 30 // Default number of students
 };
 
 const initialFormData: FormData = {
@@ -71,6 +76,9 @@ const TimetableGenerator: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [errors, setErrors] = useState<FormErrors>({});
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   // Update courses array whenever courseCount changes
@@ -133,7 +141,7 @@ const TimetableGenerator: React.FC = () => {
   ) => {
     const newCourses = [...formData.courses];
     
-    if (field === 'credits') {
+    if (field === 'credits' || field === 'students') {
       newCourses[index] = {
         ...newCourses[index],
         [field]: parseInt(value as string) || 0
@@ -187,6 +195,7 @@ const TimetableGenerator: React.FC = () => {
         courseName?: string;
         credits?: string;
         professor?: string;
+        students?: string;
       } = {};
       
       if (!course.courseCode) {
@@ -208,6 +217,11 @@ const TimetableGenerator: React.FC = () => {
         courseErrors.professor = "Professor name is required";
         hasError = true;
       }
+
+      if (course.students <= 0) {
+        courseErrors.students = "Number of students must be greater than 0";
+        hasError = true;
+      }
       
       if (Object.keys(courseErrors).length > 0) {
         coursesErrors[index] = courseErrors;
@@ -223,30 +237,60 @@ const TimetableGenerator: React.FC = () => {
     return !hasError;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Save all courses to localStorage
-      const savedCourses = JSON.parse(localStorage.getItem('courses') || '[]');
+      setIsSubmitting(true);
       
-      // Add each course with department info and unique ID
-      formData.courses.forEach(course => {
-        savedCourses.push({
-          id: Date.now() + Math.random(), // Ensure unique ID
-          department: formData.department,
-          ...course
+      try {
+        // Create each course through the API instead of using localStorage
+        const creationPromises = formData.courses.map(course => {
+          const newCourse: Course = {
+            courseCode: course.courseCode,
+            courseName: course.courseName,
+            credits: course.credits,
+            professor: course.professor,
+            students: course.students,
+            department: formData.department
+          };
+          
+          return createCourse(newCourse);
         });
-      });
-      
-      localStorage.setItem('courses', JSON.stringify(savedCourses));
-      
-      setSnackbarOpen(true);
-      
-      // Redirect to dashboard to see all courses
-      setTimeout(() => {
-        navigate(`/dashboard?dept=${formData.department}`);
-      }, 1500);
+        
+        // Wait for all courses to be created
+        await Promise.all(creationPromises);
+        
+        // Optionally generate timetable immediately after creating courses
+        try {
+          // Call the API to generate timetables
+          await generateTimetables({
+            department: formData.department,
+            semester: 'Fall',
+            year: new Date().getFullYear()
+          });
+          
+          setSnackbarMessage(`${formData.courses.length > 1 ? 'Courses' : 'Course'} added and timetables generated! Redirecting to timetable view...`);
+        } catch (genError) {
+          console.error('Error generating timetable:', genError);
+          setSnackbarMessage(`${formData.courses.length > 1 ? 'Courses' : 'Course'} added successfully! Redirecting to dashboard...`);
+        }
+        
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+        
+        // Redirect to timetable view for this department
+        setTimeout(() => {
+          navigate(`/generator?dept=${formData.department}`);
+        }, 1500);
+      } catch (error) {
+        console.error('Error creating courses:', error);
+        setSnackbarMessage('Failed to create courses. Please try again.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -336,7 +380,7 @@ const TimetableGenerator: React.FC = () => {
                   />
                 </Grid>
                 
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} sm={4}>
                   <TextField
                     fullWidth
                     label="Credits"
@@ -351,7 +395,22 @@ const TimetableGenerator: React.FC = () => {
                   />
                 </Grid>
                 
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    label="Number of Students"
+                    type="number"
+                    value={course.students}
+                    onChange={(e) => handleCourseFieldChange(index, 'students', e.target.value)}
+                    InputProps={{ 
+                      inputProps: { min: 1, max: 300 } 
+                    }}
+                    error={!!(errors.courses && errors.courses[index]?.students)}
+                    helperText={errors.courses && errors.courses[index]?.students}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={4}>
                   <TextField
                     fullWidth
                     label="Professor"
@@ -372,9 +431,14 @@ const TimetableGenerator: React.FC = () => {
               color="primary"
               size="large"
               fullWidth
-              startIcon={<AddIcon />}
+              startIcon={!isSubmitting ? <AddIcon /> : null}
+              disabled={isSubmitting}
             >
-              Generate Timetables
+              {isSubmitting ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                'Generate Timetables'
+              )}
             </Button>
           </Box>
         </form>
@@ -387,10 +451,10 @@ const TimetableGenerator: React.FC = () => {
       >
         <Alert 
           onClose={handleSnackbarClose} 
-          severity="success" 
+          severity={snackbarSeverity}
           sx={{ width: '100%' }}
         >
-          {formData.courses.length > 1 ? 'Courses' : 'Course'} added successfully! Redirecting to dashboard...
+          {snackbarMessage}
         </Alert>
       </Snackbar>
     </Container>

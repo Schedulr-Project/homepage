@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Container, 
   Box, 
@@ -16,12 +16,14 @@ import {
   CardActionArea,
   Divider,
   Fab,
-  Tooltip
+  Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import AddIcon from '@mui/icons-material/Add';
 import SchoolIcon from '@mui/icons-material/School';
+import { getCourses, getCoursesByDepartment, Course } from '../services/api';
 
 const departments = [
   { id: 'all', name: 'All Departments' },
@@ -32,13 +34,8 @@ const departments = [
   { id: 'ce', name: 'Civil Engineering' }
 ];
 
-interface CourseData {
-  id: number;
-  department: string;
-  courseCode: string;
-  courseName: string;
-  credits: number;
-  professor: string;
+interface CourseData extends Course {
+  _id: string;
 }
 
 const DepartmentBlock: React.FC<{ name: string, onClick: () => void }> = ({ name, onClick }) => (
@@ -127,14 +124,43 @@ const CourseBlock: React.FC<{ course: CourseData, onClick: () => void }> = ({ co
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [department, setDepartment] = useState('all');
   const [courses, setCourses] = useState<CourseData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load courses from localStorage
+  // Parse department from URL query params if present
   useEffect(() => {
-    const savedCourses = JSON.parse(localStorage.getItem('courses') || '[]');
-    setCourses(savedCourses);
-  }, []);
+    const params = new URLSearchParams(location.search);
+    const deptParam = params.get('dept');
+    if (deptParam) {
+      setDepartment(deptParam);
+    }
+  }, [location]);
+
+  // Load courses from API
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      try {
+        let fetchedCourses;
+        if (department === 'all') {
+          fetchedCourses = await getCourses();
+        } else {
+          fetchedCourses = await getCoursesByDepartment(department);
+        }
+        setCourses(fetchedCourses);
+      } catch (err) {
+        console.error('Error fetching courses:', err);
+        setError('Failed to load courses. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, [department]);
 
   const handleChange = (event: SelectChangeEvent) => {
     setDepartment(event.target.value);
@@ -144,8 +170,8 @@ const Dashboard: React.FC = () => {
     navigate(`/generator?dept=${deptId}`);
   };
 
-  const handleViewCourse = (courseId: number) => {
-    const course = courses.find(c => c.id === courseId);
+  const handleViewCourse = (courseId: string) => {
+    const course = courses.find(c => c._id === courseId);
     if (course) {
       navigate(`/generator?dept=${course.department}&code=${course.courseCode}`);
     }
@@ -159,10 +185,6 @@ const Dashboard: React.FC = () => {
   const departmentsToShow = department === 'all' 
     ? departments.filter(dept => dept.id !== 'all')
     : departments.filter(dept => dept.id === department);
-
-  const coursesToShow = department === 'all'
-    ? courses
-    : courses.filter(course => course.department === department);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8, position: 'relative' }}>
@@ -202,38 +224,56 @@ const Dashboard: React.FC = () => {
         </Button>
       </Box>
 
-      {departmentsToShow.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h5" component="h2" gutterBottom>
-            {department === 'all' ? 'All Departments' : 'Selected Department'}
-          </Typography>
-          <Grid container spacing={3} sx={{ mt: 2, mb: 6 }}>
-            {departmentsToShow.map(dept => (
-              <DepartmentBlock 
-                key={dept.id} 
-                name={dept.name} 
-                onClick={() => handleViewTimetable(dept.id)}
-              />
-            ))}
-          </Grid>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
         </Box>
-      )}
+      ) : error ? (
+        <Box sx={{ my: 4, p: 2, bgcolor: 'error.dark', color: 'white', borderRadius: 2 }}>
+          <Typography>{error}</Typography>
+        </Box>
+      ) : (
+        <>
+          {departmentsToShow.length > 0 && (
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h5" component="h2" gutterBottom>
+                {department === 'all' ? 'All Departments' : 'Selected Department'}
+              </Typography>
+              <Grid container spacing={3} sx={{ mt: 2, mb: 6 }}>
+                {departmentsToShow.map(dept => (
+                  <DepartmentBlock 
+                    key={dept.id} 
+                    name={dept.name} 
+                    onClick={() => handleViewTimetable(dept.id)}
+                  />
+                ))}
+              </Grid>
+            </Box>
+          )}
 
-      {coursesToShow.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h5" component="h2" gutterBottom>
-            {department === 'all' ? 'All Courses' : 'Department Courses'}
-          </Typography>
-          <Grid container spacing={3} sx={{ mt: 2 }}>
-            {coursesToShow.map(course => (
-              <CourseBlock 
-                key={course.id} 
-                course={course} 
-                onClick={() => handleViewCourse(course.id)}
-              />
-            ))}
-          </Grid>
-        </Box>
+          {courses.length > 0 ? (
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h5" component="h2" gutterBottom>
+                {department === 'all' ? 'All Courses' : 'Department Courses'}
+              </Typography>
+              <Grid container spacing={3} sx={{ mt: 2 }}>
+                {courses.map(course => (
+                  <CourseBlock 
+                    key={course._id} 
+                    course={course} 
+                    onClick={() => handleViewCourse(course._id)}
+                  />
+                ))}
+              </Grid>
+            </Box>
+          ) : (
+            <Box sx={{ mt: 4, p: 3, textAlign: 'center' }}>
+              <Typography variant="h6" color="text.secondary">
+                No courses found. Create a new course to get started.
+              </Typography>
+            </Box>
+          )}
+        </>
       )}
       
       {/* Floating action button to create new timetable */}
@@ -243,7 +283,7 @@ const Dashboard: React.FC = () => {
           aria-label="add"
           sx={{ 
             position: 'fixed', 
-            bottom: 84,  // Adjusted to be above footer
+            bottom: 84,
             right: 24,
           }}
           onClick={handleCreateNew}

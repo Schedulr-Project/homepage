@@ -1,0 +1,28 @@
+1. Initialize `timetable` as a dictionary with keys as (Day → Time Slots)  
+   - Days: Monday to Saturday  
+   - Time Slots: 8 AM - 1 PM, 2 PM - 5 PM (1-hour slots)  
+   - Each day has 8 available slots  
+
+2. Sort courses based on:
+   - Higher course credits first (more hours need scheduling)
+   - If equal credits, prioritize courses with more students  
+
+3. For each course in sorted order:
+   - Determine `remaining_hours = course_credits`  
+   - Iterate over each day (Monday to Saturday):
+      - If `remaining_hours == 0`, move to next course  
+      - Find the first available **continuous** slot (1-hour or 2-hour max per day)  
+      - If a **2-hour continuous slot** is available:
+         - Assign course to that slot  
+         - Deduct `2` from `remaining_hours`  
+      - Else, if a **1-hour slot** is available:
+         - Assign course to that slot  
+         - Deduct `1` from `remaining_hours`  
+      - Mark the slot as occupied  
+
+4. Ensure no professor has two overlapping classes  
+   - Before finalizing slot allocation, check if the professor is free at that time  
+
+5. If a course cannot be scheduled within Mon-Sat, report an error or suggest adjustments  
+
+6. Output the final timetable

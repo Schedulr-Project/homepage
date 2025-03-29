@@ -11,7 +11,7 @@ const Header: React.FC = () => {
         <Toolbar disableGutters>
           <Box 
             component={RouterLink} 
-            to="/"
+            to="/dashboard" // Changed from "/" to "/dashboard"
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -83,22 +83,7 @@ const Header: React.FC = () => {
             >
               Create Timetable
             </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              component={RouterLink}
-              to="/generator"
-              sx={{
-                borderRadius: 2,
-                px: 3,
-                background: 'linear-gradient(45deg, #ff4081 30%, #c60055 90%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #ff79b0 30%, #ff4081 90%)',
-                },
-              }}
-            >
-              Timetable Generator
-            </Button>
+            {/* Removed Timetable Generator button */}
           </Box>
         </Toolbar>
       </Container>
