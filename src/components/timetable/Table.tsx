@@ -46,6 +46,18 @@ interface CellInfo {
   roomNumber: string;
 }
 
+// Add this new interface to represent continuous blocks
+interface ContinuousBlock {
+  courseCode: string;
+  professor: string;
+  roomNumber: string;
+  day: string;
+  startSlot: number;
+  endSlot: number;
+  startTime: string;
+  endTime: string;
+}
+
 const Table: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -79,6 +91,9 @@ const Table: React.FC = () => {
 
   // Map to store detailed info for each cell
   const [cellDetails, setCellDetails] = useState<{[key: string]: CellInfo}>({});
+  
+  // Add a new state to track continuous blocks
+  const [continuousBlocks, setContinuousBlocks] = useState<ContinuousBlock[]>([]);
 
   // Helper function to get slot index from time string
   const getTimeSlotIndex = (timeStr: string) => {
@@ -152,7 +167,7 @@ const Table: React.FC = () => {
     fetchData();
   }, [deptParam, codeParam]);
 
-  // Process timetable data and update the grid
+  // Process timetable data and identify continuous blocks
   const processTimeTables = (timetablesData: TimetableWithPopulatedCourse[]) => {
     // Create new grid with empty slots
     const newGrid: Record<string, string[]> = {
@@ -167,15 +182,115 @@ const Table: React.FC = () => {
     // Create new cell details map
     const newCellDetails: {[key: string]: CellInfo} = {};
     
+    // Create array to track continuous blocks
+    const blocks: ContinuousBlock[] = [];
+    
+    // First, collect all slot information
+    const courseSlotsMap: Record<string, {day: string, slot: number, details: CellInfo}[]> = {};
+    
     timetablesData.forEach(timetable => {
       // Skip processing if we have a specific course filter and this is not that course
       if (codeParam && timetable.courseId.courseCode !== codeParam) {
         return;
       }
       
+      const courseKey = `${timetable.courseId._id}-${timetable.courseId.courseCode}`;
+      
+      if (!courseSlotsMap[courseKey]) {
+        courseSlotsMap[courseKey] = [];
+      }
+      
       // Process each slot in the timetable
       timetable.slots.forEach(slot => {
         const { day, startTime, endTime, roomNumber } = slot;
+        const slotIndex = getTimeSlotIndex(startTime);
+        
+        if (slotIndex === -1) return;
+        
+        // Add this slot to the map
+        courseSlotsMap[courseKey].push({
+          day,
+          slot: slotIndex,
+          details: {
+            courseCode: timetable.courseId.courseCode,
+            professor: timetable.courseId.professor,
+            roomNumber
+          }
+        });
+      });
+    });
+    
+    // Now identify continuous blocks for each course
+    Object.keys(courseSlotsMap).forEach(courseKey => {
+      // Group slots by day
+      const dayGroups: Record<string, number[]> = {};
+      
+      courseSlotsMap[courseKey].forEach(slotInfo => {
+        if (!dayGroups[slotInfo.day]) {
+          dayGroups[slotInfo.day] = [];
+        }
+        dayGroups[slotInfo.day].push(slotInfo.slot);
+      });
+      
+      // For each day, find continuous blocks
+      Object.keys(dayGroups).forEach(day => {
+        const slots = dayGroups[day].sort((a, b) => a - b);
+        let currentBlock: number[] = [slots[0]];
+        
+        for (let i = 1; i < slots.length; i++) {
+          // If this slot is consecutive to the previous one
+          if (slots[i] === currentBlock[currentBlock.length - 1] + 1) {
+            currentBlock.push(slots[i]);
+          } else {
+            // End the current block and start a new one
+            if (currentBlock.length > 0) {
+              // Add the completed block
+              const sample = courseSlotsMap[courseKey].find(s => s.day === day && s.slot === currentBlock[0]);
+              if (sample) {
+                blocks.push({
+                  courseCode: sample.details.courseCode,
+                  professor: sample.details.professor,
+                  roomNumber: sample.details.roomNumber,
+                  day,
+                  startSlot: currentBlock[0],
+                  endSlot: currentBlock[currentBlock.length - 1],
+                  startTime: timeHeaders[currentBlock[0] - 1],
+                  endTime: timeHeaders[currentBlock[currentBlock.length - 1] - 1]
+                });
+              }
+            }
+            // Start a new block
+            currentBlock = [slots[i]];
+          }
+        }
+        
+        // Add the last block if it exists
+        if (currentBlock.length > 0) {
+          const sample = courseSlotsMap[courseKey].find(s => s.day === day && s.slot === currentBlock[0]);
+          if (sample) {
+            blocks.push({
+              courseCode: sample.details.courseCode,
+              professor: sample.details.professor,
+              roomNumber: sample.details.roomNumber,
+              day,
+              startSlot: currentBlock[0],
+              endSlot: currentBlock[currentBlock.length - 1],
+              startTime: timeHeaders[currentBlock[0] - 1],
+              endTime: timeHeaders[currentBlock[currentBlock.length - 1] - 1]
+            });
+          }
+        }
+      });
+    });
+    
+    // Now populate the grid and cell details
+    timetablesData.forEach(timetable => {
+      if (codeParam && timetable.courseId.courseCode !== codeParam) {
+        return;
+      }
+      
+      timetable.slots.forEach(slot => {
+        const { day, startTime } = slot;
         const slotIndex = getTimeSlotIndex(startTime);
         
         if (slotIndex === -1) return;
@@ -187,11 +302,10 @@ const Table: React.FC = () => {
         newCellDetails[cellKey] = {
           courseCode: timetable.courseId.courseCode,
           professor: timetable.courseId.professor,
-          roomNumber: roomNumber
+          roomNumber: slot.roomNumber
         };
         
         // Update the grid with course code (visible text)
-        // Only process days that exist in our grid
         if (day in newGrid) {
           newGrid[day][slotIndex] = timetable.courseId.courseCode;
         }
@@ -201,6 +315,7 @@ const Table: React.FC = () => {
     // Update state
     setGrid(newGrid);
     setCellDetails(newCellDetails);
+    setContinuousBlocks(blocks);
   };
 
   // Handle timetable generation
@@ -269,7 +384,20 @@ const Table: React.FC = () => {
   // Custom component for showing cell with course details
   const renderCellContent = (content: string, rowIndex: number, colIndex: number) => {
     // Return plain content for header row and first column
-    if (rowIndex === 0 || colIndex === 0) return content;
+    if (rowIndex === 0 || colIndex === 0) {
+      if (rowIndex === 0 && colIndex > 0) {
+        // Better formatting for time slot headers
+        const timeSlot = content.split(' - ');
+        return (
+          <>
+            <div style={{ fontWeight: 'bold', fontSize: '15px' }}>{timeSlot[0]}</div>
+            <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.7 }}>to</div>
+            <div style={{ fontSize: '14px' }}>{timeSlot[1]}</div>
+          </>
+        );
+      }
+      return content;
+    }
     
     // If cell is empty, return empty string
     if (!content) return '';
@@ -279,22 +407,48 @@ const Table: React.FC = () => {
     const cellKey = `${day}-${colIndex}`;
     const details = cellDetails[cellKey];
     
+    // Check if this cell is part of a continuous block
+    const block = continuousBlocks.find(b => 
+      b.day === day && 
+      colIndex >= b.startSlot && 
+      colIndex <= b.endSlot
+    );
+    
+    // Only render the content for the first cell in a continuous block
+    if (block && colIndex > block.startSlot) {
+      return { type: 'PHANTOM_CELL' as const, courseCode: content };
+    }
+    
     if (!details) return content;
     
+    // If this is the first cell of a continuous block, show duration info
+    const isMultiHour = block && (block.endSlot > block.startSlot);
+    const blockLength = block ? block.endSlot - block.startSlot + 1 : 1;
+    
     return (
-      <Box sx={{ p: 1 }}>
-        <Typography variant="body1" sx={{ fontWeight: 600 }}>{content}</Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <PersonIcon fontSize="small" />
-            <Typography variant="body2">{details.professor}</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <RoomIcon fontSize="small" />
-            <Typography variant="body2">{details.roomNumber}</Typography>
-          </Box>
-        </Box>
-      </Box>
+      <div 
+        className={isMultiHour ? "multi-hour-cell" : "single-hour-cell"}
+        data-span={isMultiHour ? blockLength : 1}
+      >
+        <div className="course-content">
+          <div className="course-title">{content}</div>
+          {isMultiHour && (
+            <div className="course-time">
+              {block?.startTime.split(' - ')[0]} - {block?.endTime.split(' - ')[1]}
+            </div>
+          )}
+          <div className="course-details">
+            <div className="professor">
+              <PersonIcon fontSize="small" />
+              <span>{details.professor}</span>
+            </div>
+            <div className="room">
+              <RoomIcon fontSize="small" />
+              <span>{details.roomNumber}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -330,7 +484,7 @@ const Table: React.FC = () => {
     <div className="table-container">
       <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
+          <Typography variant="h4" component="h1" gutterBottom fontWeight="600">
             {codeParam ? `Timetable for ${codeParam}` : `${deptName} Department Timetable`}
           </Typography>
           
@@ -374,17 +528,20 @@ const Table: React.FC = () => {
           )}
         </Box>
 
-        <div className="container">
-          <h2 className='heading'>TimeTable</h2>
-          {getRowsData().map((rowData, index) => (
-            <Cell 
-              key={index} 
-              items={rowData}
-              className={index === 0 ? "toprow" : ""}
-              renderContent={(content, colIndex) => renderCellContent(content, index, colIndex)}
-            />
-          ))}
-        </div>
+        <Paper elevation={3} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
+          <div className="timetable-container">
+            <h2 className='heading'>Timetable Schedule</h2>
+            {getRowsData().map((rowData, index) => (
+              <Cell 
+                key={index} 
+                items={rowData}
+                className={index === 0 ? "toprow" : ""}
+                rowIndex={index}
+                renderContent={(content, colIndex) => renderCellContent(content, index, colIndex)}
+              />
+            ))}
+          </div>
+        </Paper>
         
         <Snackbar
           open={snackbarOpen}

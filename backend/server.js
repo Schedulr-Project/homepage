@@ -20,18 +20,41 @@ if (!mongoURI) {
   process.exit(1);
 }
 
-mongoose.connect(mongoURI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('MongoDB Atlas connected successfully');
-  // Log the database name being used
-  console.log(`Database name: ${mongoose.connection.db.databaseName}`);
-})
-.catch(err => {
-  console.error('MongoDB connection error:', err);
-  process.exit(1);
+// Improved MongoDB connection with better error handling and options
+const connectWithRetry = () => {
+  console.log('MongoDB connection with retry');
+  return mongoose.connect(mongoURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 15000, // Timeout for server selection
+    socketTimeoutMS: 45000, // Socket timeout
+    connectTimeoutMS: 30000, // Connection timeout
+  });
+};
+
+// Initial connection
+connectWithRetry()
+  .then(() => {
+    console.log('MongoDB Atlas connected successfully');
+    console.log(`Database name: ${mongoose.connection.db.databaseName}`);
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    console.log('Will retry connection in 5 seconds...');
+    setTimeout(connectWithRetry, 5000);
+  });
+
+// Handle connection errors after initial connection
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error after initial connection:', err);
+  console.log('Attempting to reconnect...');
+  setTimeout(connectWithRetry, 5000);
+});
+
+// Handle disconnections
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected, attempting to reconnect...');
+  setTimeout(connectWithRetry, 5000);
 });
 
 // Routes
