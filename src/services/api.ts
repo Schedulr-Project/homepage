@@ -27,6 +27,21 @@ export interface Timetable {
   year: number;
 }
 
+export interface Classroom {
+  _id?: string;
+  roomNumber: string;
+  type: 'NC' | 'NR' | 'LAB';
+  capacity: number;
+  department?: string;
+  floor: number;
+  features: {
+    hasProjector: boolean;
+    hasComputers: boolean;
+    hasAC: boolean;
+  };
+  isAvailable: boolean;
+}
+
 // Course API calls
 export const getCourses = async () => {
   try {
@@ -154,12 +169,54 @@ export const generateTimetables = async (data: {
   department: string;
   semester?: string;
   year?: number;
+  regenerate?: boolean; // Add this optional flag
 }) => {
   try {
     const response = await axios.post(`${API_URL}/timetables/generate`, data);
     return response.data;
   } catch (error) {
     console.error('Error generating timetables:', error);
+    throw error;
+  }
+};
+
+// Classroom API calls
+export const getClassrooms = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/classrooms`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching classrooms:', error);
+    throw error;
+  }
+};
+
+export const getClassroomsByType = async (type: 'NC' | 'NR' | 'LAB') => {
+  try {
+    const response = await axios.get(`${API_URL}/classrooms/type/${type}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching ${type} classrooms:`, error);
+    throw error;
+  }
+};
+
+export const getClassroomsByDepartment = async (department: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/classrooms/department/${department}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching classrooms for department ${department}:`, error);
+    throw error;
+  }
+};
+
+export const getClassroom = async (roomNumber: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/classrooms/${roomNumber}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching classroom ${roomNumber}:`, error);
     throw error;
   }
 };

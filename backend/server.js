@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const courseRoutes = require('./routes/courseRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
+const classroomRoutes = require('./routes/classroomRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -60,6 +61,7 @@ mongoose.connection.on('disconnected', () => {
 // Routes
 app.use('/api/courses', courseRoutes);
 app.use('/api/timetables', timetableRoutes);
+app.use('/api/classrooms', classroomRoutes);
 
 // Base route
 app.get('/', (req, res) => {

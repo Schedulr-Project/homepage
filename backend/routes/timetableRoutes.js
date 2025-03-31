@@ -108,7 +108,12 @@ router.delete('/:id', async (req, res) => {
 // Generate timetables for all courses in a department
 router.post('/generate', async (req, res) => {
   try {
-    const { department, semester = 'Fall', year = new Date().getFullYear() } = req.body;
+    const { 
+      department, 
+      semester = 'Fall', 
+      year = new Date().getFullYear(),
+      regenerate = false // New flag to indicate regeneration
+    } = req.body;
     
     if (!department) {
       return res.status(400).json({ message: 'Department is required' });
@@ -121,14 +126,17 @@ router.post('/generate', async (req, res) => {
       return res.status(404).json({ message: 'No courses found in this department' });
     }
     
-    // Delete any existing timetables for this department, semester and year
-    await Timetable.deleteMany({ 
-      department, 
-      semester, 
-      year
-    });
+    // Delete existing timetables for this department if regenerating
+    if (regenerate) {
+      await Timetable.deleteMany({ 
+        department, 
+        semester, 
+        year
+      });
+      console.log('Deleted existing timetables for regeneration');
+    }
     
-    // Generate timetable
+    // Generate new timetable with different slot allocations
     const { createdTimetables } = await schedulingService.generateTimetable(
       courses, 
       semester, 
@@ -137,7 +145,7 @@ router.post('/generate', async (req, res) => {
     );
     
     res.status(201).json({
-      message: `Generated timetables for ${createdTimetables.length} courses`,
+      message: `${regenerate ? 'Regenerated' : 'Generated'} timetables for ${createdTimetables.length} courses`,
       timetables: createdTimetables
     });
   } catch (err) {

@@ -325,18 +325,22 @@ const Table: React.FC = () => {
     try {
       setIsGenerating(true);
       
-      // Call the API to generate timetables
+      // Delete existing timetables first to ensure clean regeneration
+      await Promise.all(timetables.map(tt => 
+        fetch(`${process.env.REACT_APP_API_URL}/timetables/${tt._id}`, { method: 'DELETE' })
+      ));
+
+      // Generate new timetables
       const result = await generateTimetables({
         department: deptParam,
         semester: 'Fall',
-        year: new Date().getFullYear()
+        year: new Date().getFullYear(),
+        regenerate: true // Add this flag to indicate regeneration
       });
       
-      // Refresh the timetables
+      // Fetch and process the new timetables
       const updatedTimetables = await getTimetablesByDepartment(deptParam);
-      
-      // Process the updated timetables
-      const processedTimetables: TimetableWithPopulatedCourse[] = updatedTimetables.map((tt: any) => {
+      const processedTimetables = updatedTimetables.map((tt: any) => {
         const courseData = typeof tt.courseId === 'string' 
           ? courses.find((c: CourseData) => c._id === tt.courseId)
           : tt.courseId;
@@ -351,7 +355,7 @@ const Table: React.FC = () => {
       processTimeTables(processedTimetables);
       
       // Show success message
-      setSnackbarMessage(`Successfully generated timetables for ${result.timetables.length} courses`);
+      setSnackbarMessage('Successfully regenerated timetable with new slot allocations');
       setSnackbarOpen(true);
       
     } catch (err) {
@@ -517,12 +521,24 @@ const Table: React.FC = () => {
                 color="primary"
                 onClick={handleGenerateTimetables}
                 disabled={isGenerating}
-                sx={{ mt: 2 }}
+                startIcon={<CalendarMonthIcon />}
+                sx={{ 
+                  mt: 2,
+                  bgcolor: 'primary.main',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                  }
+                }}
               >
-                {isGenerating ? 'Generating...' : 'Generate Department Timetable'}
+                {isGenerating ? (
+                  <>
+                    <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
+                    Regenerating...
+                  </>
+                ) : 'Regenerate Timetable'}
               </Button>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                This will create a new timetable for all courses in this department.
+                This will create a new timetable with different time slots for all courses.
               </Typography>
             </Box>
           )}

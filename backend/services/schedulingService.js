@@ -5,6 +5,8 @@
 
 const Course = require('../models/Course');
 const Timetable = require('../models/Timetable');
+const Classroom = require('../models/Classroom');
+const classroomService = require('./classroomService');
 const fs = require('fs');
 const path = require('path');
 
@@ -232,6 +234,34 @@ const assignClassroomsToCourses = (courses) => {
   return classrooms;
 };
 
+// Add this new function for random time slot selection
+const getRandomSlot = (day, duration, timetable, professor) => {
+  // Create array of possible starting slots
+  const possibleSlots = [];
+  const maxStartSlot = TIME_SLOTS.length - duration;
+
+  // Prefer afternoon slots (index 5 onwards) for longer duration
+  const slots = duration > 1 ? 
+    [...Array(maxStartSlot + 1).keys()].sort((a, b) => {
+      // Prioritize afternoon slots
+      if (a >= 5 && b < 5) return -1;
+      if (b >= 5 && a < 5) return 1;
+      return Math.random() - 0.5; // Random sort within morning/afternoon groups
+    }) :
+    [...Array(maxStartSlot + 1).keys()].sort(() => Math.random() - 0.5); // Completely random for 1-hour slots
+
+  for (const startSlot of slots) {
+    if (areConsecutiveSlotsAvailable(timetable, day, startSlot, duration) &&
+        Array.from({length: duration}).every((_,i) => 
+          professorIsFree(timetable, day, startSlot + i, professor))) {
+      possibleSlots.push(startSlot);
+    }
+  }
+
+  return possibleSlots.length > 0 ? 
+    possibleSlots[Math.floor(Math.random() * possibleSlots.length)] : null;
+};
+
 /**
  * Generate timetable for a set of courses
  * @param {Array} courses - Array of course objects
@@ -257,19 +287,19 @@ const generateTimetable = async (courses, semester, year, departmentId) => {
     return b.students - a.students; // More students first if credits are equal
   });
   
-  // Assign fixed classrooms to each course
-  const courseClassrooms = assignClassroomsToCourses(sortedCourses);
-  
   // Map to track remaining hours for each course
   const remainingHours = {};
   // Store generated time slots for each course
   const courseSlots = {};
+  // Create a courses map for looking up by ID
+  const coursesMap = {};
   
   sortedCourses.forEach(course => {
     // Make sure we correctly convert any ID format to string
     const courseId = ensureStringId(course._id);
     remainingHours[courseId] = course.credits;
     courseSlots[courseId] = [];
+    coursesMap[courseId] = course;
   });
 
   // Track day usage for better distribution
@@ -290,166 +320,105 @@ const generateTimetable = async (courses, semester, year, departmentId) => {
   // We'll explicitly target low-usage days for better distribution
   for (const course of twoCreditCourses) {
     const courseId = ensureStringId(course._id);
-    
-    // Get the fixed classroom assigned to this course
-    const fixedClassroom = courseClassrooms[courseId];
-    
-    console.log(`Scheduling 3-hour block for 2-credit course: ${course.courseCode} in ${fixedClassroom}`);
-    
-    // Sort days by usage (least used days first)
-    const daysOrderedByUsage = [...DAYS].sort((a, b) => dayUsage[a] - dayUsage[b]);
+    console.log(`Scheduling 3-hour block for 2-credit course: ${course.courseCode}`);
+
+    // Get days ordered by current usage but with random factor
+    const daysOrderedByUsage = [...DAYS].sort((a, b) => {
+      const usageDiff = dayUsage[a] - dayUsage[b];
+      // Add randomness while still considering usage
+      return usageDiff + (Math.random() - 0.5) * 0.5;
+    });
+
     let blockAssigned = false;
     
     for (const day of daysOrderedByUsage) {
-      // First try afternoon slots (after 1 PM) - preferred for labs
-      for (let slotIndex = 5; slotIndex <= TIME_SLOTS.length - 3; slotIndex++) {
-        if (areConsecutiveSlotsAvailable(timetable, day, slotIndex, 3) &&
-            professorIsFree(timetable, day, slotIndex, course.professor) &&
-            professorIsFree(timetable, day, slotIndex + 1, course.professor) &&
-            professorIsFree(timetable, day, slotIndex + 2, course.professor)) {
-          
-          // Assign course to the 3-hour continuous block
-          assignCourseToSlots(timetable, day, slotIndex, 3, course);
-          remainingHours[courseId] = 0;
-          
-          // Create three 1-hour slots in courseSlots for database
-          for (let i = 0; i < 3; i++) {
-            courseSlots[courseId].push({
-              day,
-              startTime: TIME_SLOTS[slotIndex + i].start,
-              endTime: TIME_SLOTS[slotIndex + i].end,
-              roomNumber: fixedClassroom
-            });
-          }
-          
-          // Increase day usage - weight 3-hour blocks higher
-          dayUsage[day] += 1.5; // Give more weight to longer blocks
-          
-          console.log(`Scheduled 3-hour block for ${course.courseCode} on ${day} (usage now: ${dayUsage[day]}) in ${fixedClassroom}`);
-          
-          blockAssigned = true;
-          break;
-        }
-      }
+      const startSlot = getRandomSlot(day, 3, timetable, course.professor);
       
-      if (blockAssigned) break;
-      
-      // If afternoon slots are not available, try morning slots
-      for (let slotIndex = 0; slotIndex <= TIME_SLOTS.length - 3; slotIndex++) {
-        // Skip already tried afternoon slots
-        if (slotIndex >= 5) continue;
+      if (startSlot !== null) {
+        assignCourseToSlots(timetable, day, startSlot, 3, course);
+        remainingHours[courseId] = 0;
         
-        if (areConsecutiveSlotsAvailable(timetable, day, slotIndex, 3) &&
-            professorIsFree(timetable, day, slotIndex, course.professor) &&
-            professorIsFree(timetable, day, slotIndex + 1, course.professor) &&
-            professorIsFree(timetable, day, slotIndex + 2, course.professor)) {
-          
-          assignCourseToSlots(timetable, day, slotIndex, 3, course);
-          remainingHours[courseId] = 0;
-          
-          for (let i = 0; i < 3; i++) {
-            courseSlots[courseId].push({
-              day,
-              startTime: TIME_SLOTS[slotIndex + i].start,
-              endTime: TIME_SLOTS[slotIndex + i].end,
-              roomNumber: fixedClassroom
-            });
-          }
-          
-          // Increase day usage
-          dayUsage[day] += 1.5;
-          
-          console.log(`Scheduled 3-hour block for ${course.courseCode} on ${day} (usage now: ${dayUsage[day]}) in ${fixedClassroom}`);
-          
-          blockAssigned = true;
-          break;
+        for (let i = 0; i < 3; i++) {
+          courseSlots[courseId].push({
+            day,
+            startTime: TIME_SLOTS[startSlot + i].start,
+            endTime: TIME_SLOTS[startSlot + i].end
+          });
         }
+        
+        dayUsage[day] += 1.5;
+        blockAssigned = true;
+        break;
       }
-      
-      if (blockAssigned) break;
     }
     
     // Force scheduling if necessary
     if (!blockAssigned) {
-      // Get the least used day
       const leastUsedDay = daysOrderedByUsage[0];
-      
       console.log(`Forcing 3-hour block for ${course.courseCode} on least used day: ${leastUsedDay}`);
       
-      // Try afternoon slots first (index 5 and up)
       for (let startSlot = 5; startSlot <= TIME_SLOTS.length - 3; startSlot++) {
         let canClear = true;
         
-        // Check professor availability
         if (!professorIsFree(timetable, leastUsedDay, startSlot, course.professor) ||
             !professorIsFree(timetable, leastUsedDay, startSlot + 1, course.professor) ||
             !professorIsFree(timetable, leastUsedDay, startSlot + 2, course.professor)) {
           continue;
         }
         
-        // Clear any occupied slots
         for (let i = 0; i < 3; i++) {
           if (!isSlotAvailable(timetable, leastUsedDay, startSlot + i)) {
             timetable[leastUsedDay][startSlot + i] = null;
           }
         }
         
-        // Assign course to slots
         assignCourseToSlots(timetable, leastUsedDay, startSlot, 3, course);
         remainingHours[courseId] = 0;
         
-        // Store slots
         for (let i = 0; i < 3; i++) {
           courseSlots[courseId].push({
             day: leastUsedDay,
             startTime: TIME_SLOTS[startSlot + i].start,
-            endTime: TIME_SLOTS[startSlot + i].end,
-            roomNumber: fixedClassroom
+            endTime: TIME_SLOTS[startSlot + i].end
           });
         }
         
         dayUsage[leastUsedDay] += 1.5;
-        console.log(`FORCED 3-hour block for ${course.courseCode} on ${leastUsedDay} (usage now: ${dayUsage[leastUsedDay]}) in ${fixedClassroom}`);
+        console.log(`FORCED 3-hour block for ${course.courseCode} on ${leastUsedDay} (usage now: ${dayUsage[leastUsedDay]})`);
         
         blockAssigned = true;
         break;
       }
       
-      // If still not assigned, try morning slots
       if (!blockAssigned) {
         for (let startSlot = 0; startSlot < 5; startSlot++) {
           if (startSlot + 2 >= TIME_SLOTS.length) continue;
           
-          // Check professor availability
           if (!professorIsFree(timetable, leastUsedDay, startSlot, course.professor) ||
               !professorIsFree(timetable, leastUsedDay, startSlot + 1, course.professor) ||
               !professorIsFree(timetable, leastUsedDay, startSlot + 2, course.professor)) {
             continue;
           }
           
-          // Clear any occupied slots
           for (let i = 0; i < 3; i++) {
             if (!isSlotAvailable(timetable, leastUsedDay, startSlot + i)) {
               timetable[leastUsedDay][startSlot + i] = null;
             }
           }
           
-          // Assign course to slots
           assignCourseToSlots(timetable, leastUsedDay, startSlot, 3, course);
           remainingHours[courseId] = 0;
           
-          // Store slots
           for (let i = 0; i < 3; i++) {
             courseSlots[courseId].push({
               day: leastUsedDay,
               startTime: TIME_SLOTS[startSlot + i].start,
-              endTime: TIME_SLOTS[startSlot + i].end,
-              roomNumber: fixedClassroom
+              endTime: TIME_SLOTS[startSlot + i].end
             });
           }
           
           dayUsage[leastUsedDay] += 1.5;
-          console.log(`FORCED morning 3-hour block for ${course.courseCode} on ${leastUsedDay} (usage now: ${dayUsage[leastUsedDay]}) in ${fixedClassroom}`);
+          console.log(`FORCED morning 3-hour block for ${course.courseCode} on ${leastUsedDay} (usage now: ${dayUsage[leastUsedDay]})`);
           
           blockAssigned = true;
           break;
@@ -462,60 +431,70 @@ const generateTimetable = async (courses, semester, year, departmentId) => {
     }
   }
   
-  // PHASE 1: Distribute the regular courses with balanced day usage
+  // PHASE 1: Regular courses with randomized distribution
   for (const course of sortedCourses) {
     const courseId = ensureStringId(course._id);
-    
-    // Skip 2-credit courses as they've already been scheduled
     if (course.credits === 2 || remainingHours[courseId] <= 0) continue;
-    
-    // Get the fixed classroom assigned to this course
-    const fixedClassroom = courseClassrooms[courseId];
-    console.log(`PHASE 1: Processing ${course.courseCode} with ${remainingHours[courseId]} credits in ${fixedClassroom}`);
-    
-    // Try to distribute each credit hour across different days, prioritizing days with lowest usage
+
     while (remainingHours[courseId] > 0) {
-      // Sort days by current usage (least used first)
-      const daysOrderedByUsage = [...DAYS].sort((a, b) => dayUsage[a] - dayUsage[b]);
+      // Randomize day selection with weighted preference for less used days
+      const daysOrderedByUsage = [...DAYS].sort((a, b) => {
+        const usageDiff = dayUsage[a] - dayUsage[b];
+        return usageDiff + (Math.random() - 0.5) * 0.8; // Increased randomness factor
+      });
+
       let scheduled = false;
-      
+
       for (const day of daysOrderedByUsage) {
-        // Try to schedule on this day
-        for (let slotIndex = 0; slotIndex < TIME_SLOTS.length; slotIndex++) {
-          if (isSlotAvailable(timetable, day, slotIndex) && 
-              professorIsFree(timetable, day, slotIndex, course.professor)) {
-            
-            // Assign course to this slot
-            assignCourseToSlots(timetable, day, slotIndex, 1, course);
-            remainingHours[courseId] -= 1;
-            
-            // Store slot information with fixed classroom
-            courseSlots[courseId].push({
-              day,
-              startTime: TIME_SLOTS[slotIndex].start,
-              endTime: TIME_SLOTS[slotIndex].end,
-              roomNumber: fixedClassroom
-            });
-            
-            // Increment day usage
-            dayUsage[day] += 1;
-            
-            scheduled = true;
-            console.log(`Scheduled 1 hr of ${course.courseCode} on ${day} (usage now: ${dayUsage[day]}) in ${fixedClassroom}`);
-            break;
-          }
-        }
+        const startSlot = getRandomSlot(day, 1, timetable, course.professor);
         
-        // Try next day if we scheduled on this one or if we couldn't schedule
-        if (scheduled || remainingHours[courseId] <= 0) break;
+        if (startSlot !== null) {
+          assignCourseToSlots(timetable, day, startSlot, 1, course);
+          remainingHours[courseId] -= 1;
+          
+          courseSlots[courseId].push({
+            day,
+            startTime: TIME_SLOTS[startSlot].start,
+            endTime: TIME_SLOTS[startSlot].end
+          });
+          
+          dayUsage[day] += 1;
+          scheduled = true;
+          break;
+        }
       }
-      
-      // If we couldn't schedule anywhere, we have a problem
+
       if (!scheduled) {
         console.error(`Failed to schedule remaining ${remainingHours[courseId]} hours for ${course.courseCode}`);
         break;
       }
     }
+  }
+  
+  // PHASE 2: Allocate classrooms for all courses
+  try {
+    console.log("Starting classroom allocation...");
+    const updatedCourseSlots = await classroomService.allocateClassrooms(courseSlots, coursesMap);
+    console.log("Classroom allocation completed successfully");
+    
+    // Log classroom assignments
+    for (const courseId in updatedCourseSlots) {
+      const course = coursesMap[courseId];
+      const slots = updatedCourseSlots[courseId];
+      
+      if (slots.length > 0) {
+        const roomNumber = slots[0].roomNumber;
+        console.log(`Course ${course.courseCode} assigned to room ${roomNumber}`);
+      }
+    }
+    
+    // Use the updated course slots with room allocations
+    for (const courseId in updatedCourseSlots) {
+      courseSlots[courseId] = updatedCourseSlots[courseId];
+    }
+  } catch (error) {
+    console.error("Error during classroom allocation:", error);
+    // Continue with the original slots if allocation fails
   }
   
   // Create timetables in the database
@@ -538,7 +517,7 @@ const generateTimetable = async (courses, semester, year, departmentId) => {
         const newTimetable = new Timetable(timetableData);
         const savedTimetable = await newTimetable.save();
         createdTimetables.push(savedTimetable);
-        console.log(`Successfully created timetable for ${course.courseCode} with ${slots.length} slots in ${courseClassrooms[courseId]}`);
+        console.log(`Successfully created timetable for ${course.courseCode} with ${slots.length} slots in ${slots[0].roomNumber}`);
       } catch (error) {
         console.error(`Error saving timetable for course ${course.courseCode}:`, error);
       }
