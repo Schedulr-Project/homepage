@@ -20,3 +20,96 @@
 .toprow div {
   border: 0;
 }
+
+/* Add a specific class for PDF printing */
+.timetable-container.pdf-mode {
+  width: 1800px !important; /* Increased width to match pdfUtils.ts */
+  min-width: 1800px !important;
+  overflow: visible !important;
+  background-color: rgba(26, 32, 44, 0.9) !important;
+  color: white !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  page-break-inside: avoid !important;
+}
+
+.pdf-mode .timetable-row {
+  display: grid;
+  grid-template-columns: 140px repeat(9, minmax(160px, 1fr)) !important; /* Adjust grid to match the new day column width */
+  width: 100% !important;
+}
+
+.pdf-mode .day-col {
+  width: 140px !important; /* Match the new width for PDF mode */
+  min-width: 140px !important;
+  max-width: 140px !important;
+  position: relative !important; /* Change from sticky for PDF */
+  left: auto !important;
+}
+
+.pdf-mode .heading {
+  background: transparent !important;
+  color: white !important;
+}
+
+.pdf-mode .col {
+  background-color: rgba(26, 32, 44, 0.9) !important; /* Match the app's dark theme */
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  min-width: 160px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+.pdf-mode .toprow .col {
+  background-color: rgba(30, 40, 50, 0.9) !important;
+  color: white !important;
+}
+
+.pdf-mode .day-col {
+  background-color: rgba(20, 30, 40, 0.9) !important;
+  color: white !important;
+}
+
+.pdf-mode .multi-hour-cell,
+.pdf-mode .single-hour-cell {
+  background-color: rgba(26, 32, 44, 0.9) !important;
+  color: white !important;
+  border-left: 4px solid #64b5f6 !important;
+}
+
+.pdf-mode .course-title {
+  color: white !important;
+}
+
+.pdf-mode .course-time {
+  background-color: rgba(100, 181, 246, 0.25) !important;
+  color: #64b5f6 !important;
+}
+
+.pdf-mode .course-details {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.pdf-mode .professor,
+.pdf-mode .room {
+  color: #e0e0e0 !important;
+}
+
+@media print {
+  .table-container {
+    padding: 0 !important;
+  }
+  
+  .timetable-container {
+    width: 100% !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .timetable-row {
+    display: grid;
+    grid-template-columns: 120px repeat(9, 1fr) !important;
+  }
+}

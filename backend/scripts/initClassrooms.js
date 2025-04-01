@@ -75,18 +75,26 @@ const initializeClassrooms = async () => {
       }
     }
     
-    // Create department-specific labs
-    const departments = ['cs', 'ee', 'me', 'ce', 'mnc'];
+    // Create department labs with sequential numbers 101-110
+    const departments = [
+      { id: 'cs', name: 'CS' },
+      { id: 'ee', name: 'EE' },
+      { id: 'me', name: 'ME' },
+      { id: 'ce', name: 'CE' },
+      { id: 'mnc', name: 'MNC' }
+    ];
+
     departments.forEach(dept => {
-      for (let room = 1; room <= 10; room++) {
-        // Format lab numbers as CS-LAB-101, EE-LAB-101, etc.
-        const roomNumber = `${dept.toUpperCase()}-LAB-${room.toString().padStart(3, '0')}`;
+      // Create labs 101-110 for each department
+      for (let i = 1; i <= 10; i++) {
+        const labNumber = 100 + i;
+        const roomNumber = `${dept.name}-${labNumber}`; // Format: CS-101, EE-101, etc.
         classrooms.push({
           roomNumber,
           type: 'LAB',
-          capacity: Math.floor(Math.random() * 30) + 30,
-          department: dept,
-          floor: Math.ceil(Math.random() * 3),
+          capacity: Math.floor(Math.random() * 30) + 30, // 30-59 capacity
+          department: dept.id,
+          floor: Math.ceil(labNumber / 100), // Floor based on first digit
           features: {
             hasProjector: true,
             hasComputers: true,

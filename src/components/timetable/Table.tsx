@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Table.css';
 import Cell from './Cell';
@@ -13,6 +13,8 @@ import {
   Chip,
   Alert,
   Snackbar,
+  Tooltip,
+  ButtonGroup,
 } from '@mui/material';
 import { 
   getCoursesByDepartment, 
@@ -25,6 +27,8 @@ import {
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PersonIcon from '@mui/icons-material/Person';
 import RoomIcon from '@mui/icons-material/Room';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import { generatePDF } from '../../utils/pdfUtils';
 
 interface CourseData extends Course {
   _id: string;
@@ -94,6 +98,10 @@ const Table: React.FC = () => {
   
   // Add a new state to track continuous blocks
   const [continuousBlocks, setContinuousBlocks] = useState<ContinuousBlock[]>([]);
+
+  // Add a ref to the timetable element for PDF generation
+  const timetableRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Helper function to get slot index from time string
   const getTimeSlotIndex = (timeStr: string) => {
@@ -368,6 +376,33 @@ const Table: React.FC = () => {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    if (!timetableRef.current) return;
+    
+    try {
+      setIsGeneratingPDF(true);
+      
+      // Generate a filename based on department or course code
+      let filename = 'schedulr-timetable.pdf';
+      if (codeParam) {
+        filename = `schedulr-${codeParam}-timetable.pdf`;
+      } else if (deptParam) {
+        filename = `schedulr-${deptParam}-timetable.pdf`;
+      }
+      
+      await generatePDF(timetableRef.current, filename);
+      
+      setSnackbarMessage('Timetable PDF downloaded successfully!');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      setSnackbarMessage('Failed to generate PDF. Please try again.');
+      setSnackbarOpen(true);
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
   };
@@ -486,7 +521,7 @@ const Table: React.FC = () => {
 
   return (
     <div className="table-container">
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 10 }}>
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom fontWeight="600">
             {codeParam ? `Timetable for ${codeParam}` : `${deptName} Department Timetable`}
@@ -516,27 +551,43 @@ const Table: React.FC = () => {
           
           {!codeParam && deptParam && courses.length > 0 && (
             <Box sx={{ mb: 3 }}>
-              <Button 
-                variant="contained"
-                color="primary"
-                onClick={handleGenerateTimetables}
-                disabled={isGenerating}
-                startIcon={<CalendarMonthIcon />}
-                sx={{ 
-                  mt: 2,
-                  bgcolor: 'primary.main',
-                  '&:hover': {
-                    bgcolor: 'primary.dark',
-                  }
-                }}
-              >
-                {isGenerating ? (
-                  <>
-                    <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-                    Regenerating...
-                  </>
-                ) : 'Regenerate Timetable'}
-              </Button>
+              <ButtonGroup variant="contained" sx={{ mt: 2 }}>
+                <Button 
+                  color="primary"
+                  onClick={handleGenerateTimetables}
+                  disabled={isGenerating}
+                  startIcon={<CalendarMonthIcon />}
+                  sx={{ 
+                    bgcolor: 'primary.main',
+                    '&:hover': {
+                      bgcolor: 'primary.dark',
+                    }
+                  }}
+                >
+                  {isGenerating ? (
+                    <>
+                      <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
+                      Regenerating...
+                    </>
+                  ) : 'Regenerate Timetable'}
+                </Button>
+                
+                <Button
+                  color="secondary"
+                  onClick={handleDownloadPDF}
+                  disabled={isGeneratingPDF}
+                  startIcon={isGeneratingPDF ? <CircularProgress size={20} color="inherit" /> : <FileDownloadIcon />}
+                  sx={{ 
+                    bgcolor: 'secondary.main',
+                    '&:hover': {
+                      bgcolor: 'secondary.dark',
+                    }
+                  }}
+                >
+                  {isGeneratingPDF ? 'Generating...' : 'Download PDF'}
+                </Button>
+              </ButtonGroup>
+              
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 This will create a new timetable with different time slots for all courses.
               </Typography>
@@ -544,19 +595,32 @@ const Table: React.FC = () => {
           )}
         </Box>
 
-        <Paper elevation={3} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
-          <div className="timetable-container">
-            <h2 className='heading'>Timetable Schedule</h2>
-            {getRowsData().map((rowData, index) => (
-              <Cell 
-                key={index} 
-                items={rowData}
-                className={index === 0 ? "toprow" : ""}
-                rowIndex={index}
-                renderContent={(content, colIndex) => renderCellContent(content, index, colIndex)}
-              />
-            ))}
-          </div>
+        <Paper 
+          elevation={3} 
+          sx={{ 
+            borderRadius: '12px', 
+            overflow: 'hidden',
+            mb: 5,
+          }}
+        >
+          <Box sx={{ overflowX: 'auto', minWidth: '100%' }}>
+            <div className="timetable-container" ref={timetableRef}>
+              <h2 className='heading'>
+                {codeParam 
+                  ? `${codeParam} - ${courseData?.courseName || ''} Timetable` 
+                  : `${deptName} Department Timetable Schedule`}
+              </h2>
+              {getRowsData().map((rowData, index) => (
+                <Cell 
+                  key={index} 
+                  items={rowData}
+                  className={index === 0 ? "toprow" : ""}
+                  rowIndex={index}
+                  renderContent={(content, colIndex) => renderCellContent(content, index, colIndex)}
+                />
+              ))}
+            </div>
+          </Box>
         </Paper>
         
         <Snackbar
