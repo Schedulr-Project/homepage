@@ -3,6 +3,7 @@ import { AppBar, Toolbar, Typography, Button, Box, Container } from '@mui/materi
 import { Link as RouterLink } from 'react-router-dom';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
 
 const Header: React.FC = () => {
   return (
@@ -71,6 +72,21 @@ const Header: React.FC = () => {
             <Button 
               color="inherit"
               component={RouterLink}
+              to="/edit-timetable?dept=cs" // Default to CS department
+              startIcon={<EditIcon />}
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
+              }}
+            >
+              Edit Timetable
+            </Button>
+            <Button 
+              color="inherit"
+              component={RouterLink}
               to="/create"
               startIcon={<AddIcon />}
               sx={{
@@ -83,7 +99,6 @@ const Header: React.FC = () => {
             >
               Create Timetable
             </Button>
-            {/* Removed Timetable Generator button */}
           </Box>
         </Toolbar>
       </Container>

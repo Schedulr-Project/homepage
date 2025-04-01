@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Table from './components/timetable/Table';
 import TimetableGenerator from './components/timetable/TimetableGenerator';
+import EditTimetable from './components/timetable/EditTimetable';
 import Footer from './components/Footer';
 import theme from './theme';
 
@@ -29,6 +30,7 @@ function App() {
               <Route path="/" element={<Login />} />
               <Route path="/login" element={<Login />} />
               <Route path="/generator" element={<Table />} />
+              <Route path="/edit-timetable" element={<EditTimetable />} />
               <Route path="/create" element={<TimetableGenerator />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

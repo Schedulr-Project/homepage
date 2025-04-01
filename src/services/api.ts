@@ -13,6 +13,7 @@ export interface Course {
 }
 
 export interface TimeSlot {
+  _id?: string;
   day: string;
   startTime: string;
   endTime: string;
@@ -176,6 +177,66 @@ export const generateTimetables = async (data: {
     return response.data;
   } catch (error) {
     console.error('Error generating timetables:', error);
+    throw error;
+  }
+};
+
+// New API calls for timetable editing
+export const updateTimetableSlot = async (data: {
+  timetableId: string;
+  slotId?: string;
+  isNewSlot: boolean;
+  department: string;
+  courseId: string;
+  roomNumber: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+}) => {
+  try {
+    if (data.isNewSlot) {
+      // Creating a new slot (either adding to existing timetable or creating new one)
+      const response = await axios.post(`${API_URL}/timetables/slot`, data);
+      return response.data;
+    } else {
+      // Updating an existing slot
+      const response = await axios.put(
+        `${API_URL}/timetables/${data.timetableId}/slot/${data.slotId}`, 
+        data
+      );
+      return response.data;
+    }
+  } catch (error) {
+    console.error('Error updating timetable slot:', error);
+    throw error;
+  }
+};
+
+// Delete a specific timetable slot
+export const deleteTimetableSlot = async (timetableId: string, slotId: string) => {
+  try {
+    const response = await axios.delete(`${API_URL}/timetables/${timetableId}/slot/${slotId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting timetable slot:', error);
+    throw error;
+  }
+};
+
+// Check if a slot is available (no conflicts)
+export const checkSlotAvailability = async (data: {
+  day: string;
+  startTime: string;
+  roomNumber: string;
+  timetableId?: string;
+  slotId?: string;
+  department?: string; // Add department parameter
+}) => {
+  try {
+    const response = await axios.post(`${API_URL}/timetables/check-slot-availability`, data);
+    return response.data;
+  } catch (error) {
+    console.error('Error checking slot availability:', error);
     throw error;
   }
 };

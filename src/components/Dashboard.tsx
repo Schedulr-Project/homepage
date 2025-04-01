@@ -23,6 +23,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import AddIcon from '@mui/icons-material/Add';
 import SchoolIcon from '@mui/icons-material/School';
+import EditIcon from '@mui/icons-material/Edit';
 import { getCourses, getCoursesByDepartment, Course } from '../services/api';
 
 const departments = [
@@ -170,6 +171,10 @@ const Dashboard: React.FC = () => {
     navigate(`/generator?dept=${deptId}`);
   };
 
+  const handleEditTimetable = (deptId = department) => {
+    navigate(`/edit-timetable?dept=${deptId}`);
+  };
+
   const handleViewCourse = (courseId: string) => {
     const course = courses.find(c => c._id === courseId);
     if (course) {
@@ -221,6 +226,16 @@ const Dashboard: React.FC = () => {
           sx={{ height: 'fit-content' }}
         >
           View Timetable
+        </Button>
+        
+        <Button 
+          variant="outlined" 
+          color="primary" 
+          onClick={() => handleEditTimetable()}
+          startIcon={<EditIcon />}
+          sx={{ height: 'fit-content' }}
+        >
+          Edit Timetable
         </Button>
       </Box>
 
