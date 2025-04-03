@@ -4,6 +4,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import MeetingRoomIcon from '@mui/icons-material/MeetingRoom'; // Import room icon
 
 const Header: React.FC = () => {
   return (
@@ -12,7 +13,7 @@ const Header: React.FC = () => {
         <Toolbar disableGutters>
           <Box 
             component={RouterLink} 
-            to="/dashboard" // Changed from "/" to "/dashboard"
+            to="/dashboard"
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -68,6 +69,21 @@ const Header: React.FC = () => {
               }}
             >
               Login
+            </Button>
+            <Button 
+              color="inherit"
+              component={RouterLink}
+              to="/free-rooms" // Add link to free rooms
+              startIcon={<MeetingRoomIcon />}
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
+              }}
+            >
+              Find Rooms
             </Button>
             <Button 
               color="inherit"

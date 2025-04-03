@@ -281,3 +281,51 @@ export const getClassroom = async (roomNumber: string) => {
     throw error;
   }
 };
+
+// New function to find free rooms based on day and time with cache busting
+export const getFreeRooms = async (day: string, timeSlot: string, timestamp?: number) => {
+  try {
+    console.log(`API call: Fetching free rooms for ${day} at ${timeSlot}`);
+    const response = await axios.get(`${API_URL}/classrooms/free`, {
+      params: { 
+        day, 
+        timeSlot,
+        _t: timestamp || new Date().getTime() // Cache busting parameter
+      },
+      // Increase timeout for potentially slow queries
+      timeout: 10000
+    });
+    
+    console.log('API response status:', response.status);
+    
+    if (response.status !== 200) {
+      throw new Error(`Server returned status code ${response.status}`);
+    }
+    
+    if (!response.data) {
+      throw new Error('Empty response from server');
+    }
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching free rooms:', error);
+    
+    // Check for specific axios error types
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+      
+      // Get message from response if available
+      const message = error.response.data?.message || `Server error: ${error.response.status}`;
+      throw new Error(message);
+    } else if (error.request) {
+      // The request was made but no response was received
+      throw new Error('No response received from server. Check your network connection.');
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      throw new Error('An unexpected error occurred');
+    }
+  }
+};
