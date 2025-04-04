@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Table.css';
 import Cell from './Cell';
@@ -9,11 +9,8 @@ import {
   Paper, 
   CircularProgress, 
   Button,
-  Grid,
-  Chip,
-  Alert,
   Snackbar,
-  Tooltip,
+  Alert,
   ButtonGroup,
 } from '@mui/material';
 import { 
@@ -21,7 +18,6 @@ import {
   getTimetablesByDepartment,
   generateTimetables,
   Course, 
-  Timetable,
   TimeSlot 
 } from '../../services/api';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
@@ -78,33 +74,31 @@ const Table: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   
-  // Initialize timetable grid
-  const timeHeaders = ['8 AM - 9 AM','9 AM - 10 AM','10 AM - 11 AM','11 AM - 12 PM','12 PM - 1 PM','2 PM - 3 PM','3 PM - 4 PM','4 PM - 5 PM','5 PM - 6 PM'];
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const def = ['Days', ...timeHeaders];
+  // Memoize static data to prevent unnecessary re-renders
+  const timeHeaders = useMemo(() => ['8 AM - 9 AM','9 AM - 10 AM','10 AM - 11 AM','11 AM - 12 PM','12 PM - 1 PM','2 PM - 3 PM','3 PM - 4 PM','4 PM - 5 PM','5 PM - 6 PM'], []);
+  const days = useMemo(() => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], []);
+  const def = useMemo(() => ['Days', ...timeHeaders], [timeHeaders]);
   
-  // Create initial empty state for each day's slots with proper type
-  const [grid, setGrid] = useState<Record<string, string[]>>({
+  // Create initial empty state for each day's slots with proper type - memoized to avoid recreating on each render
+  const initialGrid = useMemo(() => ({
     Monday: ['Monday', '', '', '', '', '', '', '', '', ''],
     Tuesday: ['Tuesday', '', '', '', '', '', '', '', '', ''],
     Wednesday: ['Wednesday', '', '', '', '', '', '', '', '', ''],
     Thursday: ['Thursday', '', '', '', '', '', '', '', '', ''],
     Friday: ['Friday', '', '', '', '', '', '', '', '', ''],
     Saturday: ['Saturday', '', '', '', '', '', '', '', '', '']
-  });
-
-  // Map to store detailed info for each cell
-  const [cellDetails, setCellDetails] = useState<{[key: string]: CellInfo}>({});
+  }), []);
   
-  // Add a new state to track continuous blocks
+  const [grid, setGrid] = useState<Record<string, string[]>>(initialGrid);
+  const [cellDetails, setCellDetails] = useState<{[key: string]: CellInfo}>({});
   const [continuousBlocks, setContinuousBlocks] = useState<ContinuousBlock[]>([]);
 
   // Add a ref to the timetable element for PDF generation
   const timetableRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  // Helper function to get slot index from time string
-  const getTimeSlotIndex = (timeStr: string) => {
+  // Helper function to get slot index from time string - memoized to improve performance
+  const getTimeSlotIndex = useCallback((timeStr: string) => {
     const timeMap: { [key: string]: number } = {
       '8 AM': 1,
       '9 AM': 2,
@@ -117,87 +111,17 @@ const Table: React.FC = () => {
       '5 PM': 9
     };
     return timeMap[timeStr] || -1;
-  };
-
-  // Fetch timetables and courses for the department
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!deptParam) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        
-        // Fetch courses and timetables for the department
-        const [coursesData, timetablesData] = await Promise.all([
-          getCoursesByDepartment(deptParam),
-          getTimetablesByDepartment(deptParam)
-        ]);
-        
-        setCourses(coursesData);
-        
-        // Process the timetable data to ensure courseId is populated
-        const processedTimetables: TimetableWithPopulatedCourse[] = timetablesData.map((tt: any) => {
-          // Handle both populated and unpopulated courseId
-          const courseData = typeof tt.courseId === 'string' 
-            ? coursesData.find((c: CourseData) => c._id === tt.courseId)
-            : tt.courseId;
-            
-          return {
-            ...tt,
-            courseId: courseData
-          };
-        });
-        
-        setTimetables(processedTimetables);
-        
-        // If course code is specified, find that specific course
-        if (codeParam) {
-          const course = coursesData.find((c: CourseData) => c.courseCode === codeParam);
-          if (course) {
-            setCourseData(course);
-          }
-        }
-        
-        // Process timetable data to populate the grid
-        processTimeTables(processedTimetables);
-        
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load timetable data. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [deptParam, codeParam]);
+  }, []);
 
   // Process timetable data and identify continuous blocks
-  const processTimeTables = (timetablesData: TimetableWithPopulatedCourse[]) => {
-    // Create new grid with empty slots
-    const newGrid: Record<string, string[]> = {
-      Monday: ['Monday', '', '', '', '', '', '', '', '', ''],
-      Tuesday: ['Tuesday', '', '', '', '', '', '', '', '', ''],
-      Wednesday: ['Wednesday', '', '', '', '', '', '', '', '', ''],
-      Thursday: ['Thursday', '', '', '', '', '', '', '', '', ''],
-      Friday: ['Friday', '', '', '', '', '', '', '', '', ''],
-      Saturday: ['Saturday', '', '', '', '', '', '', '', '', '']
-    };
-    
-    // Create new cell details map
+  const processTimeTables = useCallback((timetablesData: TimetableWithPopulatedCourse[]) => {
+    const newGrid = { ...initialGrid };
     const newCellDetails: {[key: string]: CellInfo} = {};
-    
-    // Create array to track continuous blocks
     const blocks: ContinuousBlock[] = [];
     
-    // First, collect all slot information
     const courseSlotsMap: Record<string, {day: string, slot: number, details: CellInfo}[]> = {};
     
-    timetablesData.forEach(timetable => {
-      // Skip processing if we have a specific course filter and this is not that course
+    timetablesData.forEach((timetable: TimetableWithPopulatedCourse) => {
       if (codeParam && timetable.courseId.courseCode !== codeParam) {
         return;
       }
@@ -208,14 +132,12 @@ const Table: React.FC = () => {
         courseSlotsMap[courseKey] = [];
       }
       
-      // Process each slot in the timetable
       timetable.slots.forEach(slot => {
         const { day, startTime, endTime, roomNumber } = slot;
         const slotIndex = getTimeSlotIndex(startTime);
         
         if (slotIndex === -1) return;
         
-        // Add this slot to the map
         courseSlotsMap[courseKey].push({
           day,
           slot: slotIndex,
@@ -228,9 +150,7 @@ const Table: React.FC = () => {
       });
     });
     
-    // Now identify continuous blocks for each course
     Object.keys(courseSlotsMap).forEach(courseKey => {
-      // Group slots by day
       const dayGroups: Record<string, number[]> = {};
       
       courseSlotsMap[courseKey].forEach(slotInfo => {
@@ -240,19 +160,15 @@ const Table: React.FC = () => {
         dayGroups[slotInfo.day].push(slotInfo.slot);
       });
       
-      // For each day, find continuous blocks
       Object.keys(dayGroups).forEach(day => {
         const slots = dayGroups[day].sort((a, b) => a - b);
         let currentBlock: number[] = [slots[0]];
         
         for (let i = 1; i < slots.length; i++) {
-          // If this slot is consecutive to the previous one
           if (slots[i] === currentBlock[currentBlock.length - 1] + 1) {
             currentBlock.push(slots[i]);
           } else {
-            // End the current block and start a new one
             if (currentBlock.length > 0) {
-              // Add the completed block
               const sample = courseSlotsMap[courseKey].find(s => s.day === day && s.slot === currentBlock[0]);
               if (sample) {
                 blocks.push({
@@ -267,12 +183,10 @@ const Table: React.FC = () => {
                 });
               }
             }
-            // Start a new block
             currentBlock = [slots[i]];
           }
         }
         
-        // Add the last block if it exists
         if (currentBlock.length > 0) {
           const sample = courseSlotsMap[courseKey].find(s => s.day === day && s.slot === currentBlock[0]);
           if (sample) {
@@ -291,8 +205,7 @@ const Table: React.FC = () => {
       });
     });
     
-    // Now populate the grid and cell details
-    timetablesData.forEach(timetable => {
+    timetablesData.forEach((timetable: TimetableWithPopulatedCourse) => {
       if (codeParam && timetable.courseId.courseCode !== codeParam) {
         return;
       }
@@ -303,54 +216,107 @@ const Table: React.FC = () => {
         
         if (slotIndex === -1) return;
         
-        // Create a unique key for this cell
         const cellKey = `${day}-${slotIndex}`;
         
-        // Store full details for tooltip/popup
         newCellDetails[cellKey] = {
           courseCode: timetable.courseId.courseCode,
           professor: timetable.courseId.professor,
           roomNumber: slot.roomNumber
         };
         
-        // Update the grid with course code (visible text)
         if (day in newGrid) {
-          newGrid[day][slotIndex] = timetable.courseId.courseCode;
+          newGrid[day as keyof typeof newGrid][slotIndex] = timetable.courseId.courseCode;
         }
       });
     });
     
-    // Update state
     setGrid(newGrid);
     setCellDetails(newCellDetails);
     setContinuousBlocks(blocks);
-  };
+  }, [codeParam, timeHeaders, initialGrid]);
 
-  // Handle timetable generation
+  // Fetch timetables and courses for the department
+  useEffect(() => {
+    let isMounted = true;
+    const fetchData = async () => {
+      if (!deptParam) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        
+        const [coursesData, timetablesData] = await Promise.all([
+          getCoursesByDepartment(deptParam),
+          getTimetablesByDepartment(deptParam)
+        ]);
+        
+        if (!isMounted) return;
+        
+        setCourses(coursesData);
+        
+        const processedTimetables = timetablesData.map((tt: TimetableWithPopulatedCourse) => {
+          const courseData = typeof tt.courseId === 'string' 
+            ? coursesData.find((c: CourseData) => String(c._id) === String(tt.courseId))
+            : tt.courseId;
+            
+          return {
+            ...tt,
+            courseId: courseData
+          };
+        });
+        
+        setTimetables(processedTimetables);
+        
+        if (codeParam) {
+          const course = coursesData.find((c: CourseData) => c.courseCode === codeParam);
+          if (course) {
+            setCourseData(course);
+          }
+        }
+        
+        processTimeTables(processedTimetables);
+        
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Error fetching data:', err);
+        setError('Failed to load timetable data. Please try again.');
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [deptParam, codeParam, processTimeTables]);
+
   const handleGenerateTimetables = async () => {
     if (!deptParam) return;
     
     try {
       setIsGenerating(true);
       
-      // Delete existing timetables first to ensure clean regeneration
       await Promise.all(timetables.map(tt => 
         fetch(`${process.env.REACT_APP_API_URL}/timetables/${tt._id}`, { method: 'DELETE' })
       ));
 
-      // Generate new timetables
       const result = await generateTimetables({
         department: deptParam,
         semester: 'Fall',
         year: new Date().getFullYear(),
-        regenerate: true // Add this flag to indicate regeneration
+        regenerate: true
       });
       
-      // Fetch and process the new timetables
       const updatedTimetables = await getTimetablesByDepartment(deptParam);
-      const processedTimetables = updatedTimetables.map((tt: any) => {
+      const processedTimetables = updatedTimetables.map((tt: TimetableWithPopulatedCourse) => {
         const courseData = typeof tt.courseId === 'string' 
-          ? courses.find((c: CourseData) => c._id === tt.courseId)
+          ? courses.find((c) => String(c._id) === String(tt.courseId))
           : tt.courseId;
           
         return {
@@ -362,7 +328,6 @@ const Table: React.FC = () => {
       setTimetables(processedTimetables);
       processTimeTables(processedTimetables);
       
-      // Show success message
       setSnackbarMessage('Successfully regenerated timetable with new slot allocations');
       setSnackbarOpen(true);
       
@@ -382,7 +347,6 @@ const Table: React.FC = () => {
     try {
       setIsGeneratingPDF(true);
       
-      // Generate a filename based on department or course code
       let filename = 'schedulr-timetable.pdf';
       if (codeParam) {
         filename = `schedulr-${codeParam}-timetable.pdf`;
@@ -407,25 +371,19 @@ const Table: React.FC = () => {
     setSnackbarOpen(false);
   };
 
-  // Create array of all row data for the Cell component
-  const getRowsData = () => {
-    return [
-      def,
-      grid.Monday,
-      grid.Tuesday,
-      grid.Wednesday,
-      grid.Thursday,
-      grid.Friday,
-      grid.Saturday
-    ];
-  };
+  const rowsData = useMemo(() => [
+    def,
+    grid.Monday,
+    grid.Tuesday,
+    grid.Wednesday,
+    grid.Thursday,
+    grid.Friday,
+    grid.Saturday
+  ], [def, grid]);
 
-  // Custom component for showing cell with course details
-  const renderCellContent = (content: string, rowIndex: number, colIndex: number) => {
-    // Return plain content for header row and first column
+  const renderCellContent = useCallback((content: string, rowIndex: number, colIndex: number) => {
     if (rowIndex === 0 || colIndex === 0) {
       if (rowIndex === 0 && colIndex > 0) {
-        // Better formatting for time slot headers
         const timeSlot = content.split(' - ');
         return (
           <>
@@ -438,29 +396,24 @@ const Table: React.FC = () => {
       return content;
     }
     
-    // If cell is empty, return empty string
     if (!content) return '';
     
-    // Get day based on row index
     const day = days[rowIndex - 1];
     const cellKey = `${day}-${colIndex}`;
     const details = cellDetails[cellKey];
     
-    // Check if this cell is part of a continuous block
     const block = continuousBlocks.find(b => 
       b.day === day && 
       colIndex >= b.startSlot && 
       colIndex <= b.endSlot
     );
     
-    // Only render the content for the first cell in a continuous block
     if (block && colIndex > block.startSlot) {
       return { type: 'PHANTOM_CELL' as const, courseCode: content };
     }
     
     if (!details) return content;
     
-    // If this is the first cell of a continuous block, show duration info
     const isMultiHour = block && (block.endSlot > block.startSlot);
     const blockLength = block ? block.endSlot - block.startSlot + 1 : 1;
     
@@ -489,7 +442,11 @@ const Table: React.FC = () => {
         </div>
       </div>
     );
-  };
+  }, [days, cellDetails, continuousBlocks, timeHeaders]);
+
+  const deptName = useMemo(() => {
+    return departments.find(d => d.id === deptParam)?.name || deptParam?.toUpperCase() || '';
+  }, [deptParam]);
 
   if (isLoading) {
     return (
@@ -516,8 +473,6 @@ const Table: React.FC = () => {
       </Container>
     );
   }
-
-  const deptName = departments.find(d => d.id === deptParam)?.name || deptParam?.toUpperCase() || '';
 
   return (
     <div className="table-container">
@@ -610,7 +565,7 @@ const Table: React.FC = () => {
                   ? `${codeParam} - ${courseData?.courseName || ''} Timetable` 
                   : `${deptName} Department Timetable Schedule`}
               </h2>
-              {getRowsData().map((rowData, index) => (
+              {rowsData.map((rowData, index) => (
                 <Cell 
                   key={index} 
                   items={rowData}
@@ -651,4 +606,4 @@ const departments = [
   { id: 'ce', name: 'Civil Engineering' }
 ];
 
-export default Table;
+export default React.memo(Table);

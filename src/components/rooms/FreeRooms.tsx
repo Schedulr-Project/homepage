@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
@@ -41,11 +41,7 @@ const FreeRooms: React.FC = () => {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const timeSlots = ['8 AM', '9 AM', '10 AM', '11 AM', '12 PM', '2 PM', '3 PM', '4 PM', '5 PM'];
 
-  useEffect(() => {
-    fetchFreeRooms();
-  }, [day, timeSlot]); // Re-fetch when day or timeSlot changes
-
-  const fetchFreeRooms = async () => {
+  const fetchFreeRooms = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -101,7 +97,11 @@ const FreeRooms: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [day, timeSlot]);
+
+  useEffect(() => {
+    fetchFreeRooms();
+  }, [fetchFreeRooms]); // Updated dependency array
 
   const handleDayChange = (event: SelectChangeEvent) => {
     setDay(event.target.value);

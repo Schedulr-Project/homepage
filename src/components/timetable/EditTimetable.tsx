@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../timetable/Table.css';
 import Cell from '../timetable/Cell';
@@ -134,6 +134,53 @@ const EditTimetable: React.FC = () => {
     return times[index - 1] || '';
   };
 
+  // Process timetable data
+  const processTimeTables = useCallback((timetablesData: TimetableWithPopulatedCourse[]) => {
+    // Create new grid with empty slots
+    const newGrid: Record<string, string[]> = {
+      Monday: ['Monday', '', '', '', '', '', '', '', '', ''],
+      Tuesday: ['Tuesday', '', '', '', '', '', '', '', '', ''],
+      Wednesday: ['Wednesday', '', '', '', '', '', '', '', '', ''],
+      Thursday: ['Thursday', '', '', '', '', '', '', '', '', ''],
+      Friday: ['Friday', '', '', '', '', '', '', '', '', ''],
+      Saturday: ['Saturday', '', '', '', '', '', '', '', '', '']
+    };
+    
+    // Create new cell details map
+    const newCellDetails: {[key: string]: CellInfo} = {};
+    
+    // Process timetables to populate the grid
+    timetablesData.forEach(timetable => {
+      timetable.slots.forEach((slot, slotIndex) => {
+        const { day, startTime } = slot;
+        const slotPosition = getTimeSlotIndex(startTime);
+        
+        if (slotPosition === -1) return;
+        
+        // Create a unique key for this cell
+        const cellKey = `${day}-${slotPosition}`;
+        
+        // Store full details for this cell
+        newCellDetails[cellKey] = {
+          timetableId: timetable._id,
+          slotId: slot._id, // Store the individual slot ID for direct updates
+          courseCode: timetable.courseId.courseCode,
+          professor: timetable.courseId.professor,
+          roomNumber: slot.roomNumber,
+          courseId: timetable.courseId._id
+        };
+        
+        // Update the grid with course code
+        if (day in newGrid) {
+          newGrid[day][slotPosition] = timetable.courseId.courseCode;
+        }
+      });
+    });
+    
+    setGrid(newGrid);
+    setCellDetails(newCellDetails);
+  }, []);
+
   // Fetch timetables, courses, and classrooms for the department
   useEffect(() => {
     const fetchData = async () => {
@@ -198,54 +245,7 @@ const EditTimetable: React.FC = () => {
     };
 
     fetchData();
-  }, [selectedDepartment]);
-
-  // Process timetable data
-  const processTimeTables = (timetablesData: TimetableWithPopulatedCourse[]) => {
-    // Create new grid with empty slots
-    const newGrid: Record<string, string[]> = {
-      Monday: ['Monday', '', '', '', '', '', '', '', '', ''],
-      Tuesday: ['Tuesday', '', '', '', '', '', '', '', '', ''],
-      Wednesday: ['Wednesday', '', '', '', '', '', '', '', '', ''],
-      Thursday: ['Thursday', '', '', '', '', '', '', '', '', ''],
-      Friday: ['Friday', '', '', '', '', '', '', '', '', ''],
-      Saturday: ['Saturday', '', '', '', '', '', '', '', '', '']
-    };
-    
-    // Create new cell details map
-    const newCellDetails: {[key: string]: CellInfo} = {};
-    
-    // Process timetables to populate the grid
-    timetablesData.forEach(timetable => {
-      timetable.slots.forEach((slot, slotIndex) => {
-        const { day, startTime } = slot;
-        const slotPosition = getTimeSlotIndex(startTime);
-        
-        if (slotPosition === -1) return;
-        
-        // Create a unique key for this cell
-        const cellKey = `${day}-${slotPosition}`;
-        
-        // Store full details for this cell
-        newCellDetails[cellKey] = {
-          timetableId: timetable._id,
-          slotId: slot._id, // Store the individual slot ID for direct updates
-          courseCode: timetable.courseId.courseCode,
-          professor: timetable.courseId.professor,
-          roomNumber: slot.roomNumber,
-          courseId: timetable.courseId._id
-        };
-        
-        // Update the grid with course code
-        if (day in newGrid) {
-          newGrid[day][slotPosition] = timetable.courseId.courseCode;
-        }
-      });
-    });
-    
-    setGrid(newGrid);
-    setCellDetails(newCellDetails);
-  };
+  }, [selectedDepartment, processTimeTables]);
 
   // Function to handle cell click for editing
   const handleCellClick = (day: string, slotIndex: number) => {

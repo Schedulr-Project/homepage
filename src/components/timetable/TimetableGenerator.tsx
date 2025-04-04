@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -81,222 +81,161 @@ const TimetableGenerator: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // Update courses array whenever courseCount changes
-  useEffect(() => {
-    const newCourses = [...formData.courses];
-    const currentLength = newCourses.length;
-    const targetLength = formData.courseCount;
+  // Memoize the course array update logic to prevent unnecessary re-renders
+  const updateCoursesArray = useCallback(() => {
+    setFormData(prev => {
+      const newCourses = [...prev.courses];
+      const currentLength = newCourses.length;
+      const targetLength = prev.courseCount;
 
-    if (currentLength < targetLength) {
-      // Add more courses
-      for (let i = currentLength; i < targetLength; i++) {
-        newCourses.push({ ...initialCourseInfo });
+      if (currentLength < targetLength) {
+        for (let i = currentLength; i < targetLength; i++) {
+          newCourses.push({ ...initialCourseInfo });
+        }
+      } else if (currentLength > targetLength) {
+        newCourses.splice(targetLength);
       }
-    } else if (currentLength > targetLength) {
-      // Remove extra courses
-      newCourses.splice(targetLength);
-    }
 
-    setFormData(prev => ({
-      ...prev,
-      courses: newCourses
-    }));
-  }, [formData.courseCount]);
+      return { ...prev, courses: newCourses };
+    });
+  }, []);
+
+  // Update courses array only when courseCount changes
+  useEffect(() => {
+    updateCoursesArray();
+  }, [formData.courseCount, updateCoursesArray]);
 
   const handleDepartmentChange = (e: SelectChangeEvent) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       department: e.target.value
-    });
-    
+    }));
     if (errors.department) {
-      setErrors({
-        ...errors,
+      setErrors(prevErrors => ({
+        ...prevErrors,
         department: undefined
-      });
+      }));
     }
   };
 
   const handleCourseCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value) || 1;
     const courseCount = Math.min(Math.max(value, 1), 10); // Limit between 1-10 courses
-    
-    setFormData({
-      ...formData,
-      courseCount: courseCount
-    });
-    
+    setFormData(prev => ({
+      ...prev,
+      courseCount
+    }));
     if (errors.courseCount) {
-      setErrors({
-        ...errors,
+      setErrors(prevErrors => ({
+        ...prevErrors,
         courseCount: undefined
-      });
+      }));
     }
   };
 
   const handleCourseFieldChange = (
-    index: number, 
-    field: keyof CourseInfo, 
+    index: number,
+    field: keyof CourseInfo,
     value: string | number
   ) => {
-    const newCourses = [...formData.courses];
-    
-    if (field === 'credits' || field === 'students') {
+    setFormData(prev => {
+      const newCourses = [...prev.courses];
       newCourses[index] = {
         ...newCourses[index],
-        [field]: parseInt(value as string) || 0
+        [field]: field === 'credits' || field === 'students' ? parseInt(value as string) || 0 : value
       };
-    } else {
-      newCourses[index] = {
-        ...newCourses[index],
-        [field]: value
-      };
-    }
-    
-    setFormData({
-      ...formData,
-      courses: newCourses
+      return { ...prev, courses: newCourses };
     });
-    
-    // Clear error for this field if exists
+
     if (errors.courses && errors.courses[index] && errors.courses[index][field]) {
-      const newErrors = { ...errors };
-      if (newErrors.courses && newErrors.courses[index]) {
-        newErrors.courses[index] = {
-          ...newErrors.courses[index],
-          [field]: undefined
-        };
-      }
-      setErrors(newErrors);
+      setErrors(prevErrors => {
+        const newErrors = { ...prevErrors };
+        if (newErrors.courses && newErrors.courses[index]) {
+          newErrors.courses[index] = {
+            ...newErrors.courses[index],
+            [field]: undefined
+          };
+        }
+        return newErrors;
+      });
     }
   };
 
   const validateForm = (): boolean => {
-    // Create a new errors object with type safety
     const newErrors: FormErrors = {};
     let hasError = false;
-    
+
     if (!formData.department) {
       newErrors.department = "Department is required";
       hasError = true;
     }
-    
+
     if (formData.courseCount <= 0) {
       newErrors.courseCount = "At least one course is required";
       hasError = true;
     }
-    
-    // Create a courses errors object only if we find errors
-    const coursesErrors: { [index: number]: any } = {};
-    
-    formData.courses.forEach((course, index) => {
-      const courseErrors: {
-        courseCode?: string;
-        courseName?: string;
-        credits?: string;
-        professor?: string;
-        students?: string;
-      } = {};
-      
-      if (!course.courseCode) {
-        courseErrors.courseCode = "Course code is required";
-        hasError = true;
-      }
-      
-      if (!course.courseName) {
-        courseErrors.courseName = "Course name is required";
-        hasError = true;
-      }
-      
-      if (course.credits <= 0) {
-        courseErrors.credits = "Credits must be greater than 0";
-        hasError = true;
-      }
-      
-      if (!course.professor) {
-        courseErrors.professor = "Professor name is required";
-        hasError = true;
-      }
 
-      if (course.students <= 0) {
-        courseErrors.students = "Number of students must be greater than 0";
-        hasError = true;
-      }
-      
+    const coursesErrors: { [index: number]: any } = {};
+    formData.courses.forEach((course, index) => {
+      const courseErrors: Partial<CourseInfo> = {};
+      if (!course.courseCode) courseErrors.courseCode = "Course code is required";
+      if (!course.courseName) courseErrors.courseName = "Course name is required";
+      if (course.credits <= 0) courseErrors.credits = 1;
+      if (!course.professor) courseErrors.professor = "Professor name is required";
+      if (course.students <= 0) courseErrors.students = 1;
+
       if (Object.keys(courseErrors).length > 0) {
         coursesErrors[index] = courseErrors;
+        hasError = true;
       }
     });
-    
-    // Only add the courses errors property if we found errors
+
     if (Object.keys(coursesErrors).length > 0) {
       newErrors.courses = coursesErrors;
     }
-    
+
     setErrors(newErrors);
     return !hasError;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (validateForm()) {
-      setIsSubmitting(true);
-      
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const creationPromises = formData.courses.map(course =>
+        createCourse({
+          ...course,
+          department: formData.department
+        })
+      );
+      await Promise.all(creationPromises);
+
       try {
-        // Create each course through the API instead of using localStorage
-        const creationPromises = formData.courses.map(course => {
-          const newCourse: Course = {
-            courseCode: course.courseCode,
-            courseName: course.courseName,
-            credits: course.credits,
-            professor: course.professor,
-            students: course.students,
-            department: formData.department
-          };
-          
-          return createCourse(newCourse);
+        await generateTimetables({
+          department: formData.department,
+          semester: 'Fall',
+          year: new Date().getFullYear()
         });
-        
-        // Wait for all courses to be created
-        await Promise.all(creationPromises);
-        
-        // Optionally generate timetable immediately after creating courses
-        try {
-          // Call the API to generate timetables
-          await generateTimetables({
-            department: formData.department,
-            semester: 'Fall',
-            year: new Date().getFullYear()
-          });
-          
-          setSnackbarMessage(`${formData.courses.length > 1 ? 'Courses' : 'Course'} added and timetables generated! Redirecting to timetable view...`);
-        } catch (genError) {
-          console.error('Error generating timetable:', genError);
-          setSnackbarMessage(`${formData.courses.length > 1 ? 'Courses' : 'Course'} added successfully! Redirecting to dashboard...`);
-        }
-        
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
-        
-        // Redirect to timetable view for this department
-        setTimeout(() => {
-          navigate(`/generator?dept=${formData.department}`);
-        }, 1500);
-      } catch (error) {
-        console.error('Error creating courses:', error);
-        setSnackbarMessage('Failed to create courses. Please try again.');
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
-      } finally {
-        setIsSubmitting(false);
+        setSnackbarMessage('Courses added and timetables generated! Redirecting...');
+      } catch {
+        setSnackbarMessage('Courses added successfully! Redirecting...');
       }
+
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      setTimeout(() => navigate(`/generator?dept=${formData.department}`), 1500);
+    } catch {
+      setSnackbarMessage('Failed to create courses. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSnackbarClose = () => {
-    setSnackbarOpen(false);
-  };
+  const handleSnackbarClose = () => setSnackbarOpen(false);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>

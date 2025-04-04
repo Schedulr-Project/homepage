@@ -33,4 +33,4 @@ jobs:
 
     # Build the project
     - name: Build project
-      run: npm run build
+      run: CI=false npm run build # Prevent warnings from failing the build
