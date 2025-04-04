@@ -3,6 +3,9 @@ const router = express.Router();
 const Timetable = require('../models/Timetable');
 const Course = require('../models/Course');
 const schedulingService = require('../services/schedulingService');
+const mongoose = require('mongoose');
+// Fix the import path and destructure the authenticateUser function
+const { authenticateUser } = require('../middleware/auth');
 
 // Get all timetables
 router.get('/', async (req, res) => {
@@ -105,52 +108,181 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Generate timetables for all courses in a department
-router.post('/generate', async (req, res) => {
+// Generate timetables for a department - requires authentication
+router.post('/generate', authenticateUser, async (req, res) => {
   try {
-    const { 
-      department, 
-      semester = 'Fall', 
-      year = new Date().getFullYear(),
-      regenerate = false // New flag to indicate regeneration
-    } = req.body;
+    const { department, semester = 'Fall', year = new Date().getFullYear(), regenerate = false } = req.body;
     
+    // Check if department is provided
     if (!department) {
-      return res.status(400).json({ message: 'Department is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Department is required'
+      });
     }
     
-    // Find all courses in the department
-    const courses = await Course.find({ department });
+    console.log(`Generating timetables for ${department}, regenerate=${regenerate}`);
+    
+    // If regenerate flag is true, delete all existing timetables for this department
+    if (regenerate) {
+      const deletedInfo = await Timetable.deleteMany({ department });
+      console.log(`Deleted ${deletedInfo.deletedCount} existing timetables for department ${department}`);
+    }
+    
+    // Get all courses for this department with complete details
+    const courses = await Course.find({ department }).lean();
     
     if (courses.length === 0) {
-      return res.status(404).json({ message: 'No courses found in this department' });
-    }
-    
-    // Delete existing timetables for this department if regenerating
-    if (regenerate) {
-      await Timetable.deleteMany({ 
-        department, 
-        semester, 
-        year
+      return res.status(404).json({
+        success: false,
+        message: `No courses found for department ${department}`
       });
-      console.log('Deleted existing timetables for regeneration');
     }
     
-    // Generate new timetable with different slot allocations
-    const { createdTimetables } = await schedulingService.generateTimetable(
-      courses, 
-      semester, 
-      year, 
-      department
-    );
+    console.log(`Found ${courses.length} courses for department ${department}`);
+    
+    // Get all rooms (if classrooms collection exists)
+    let rooms = [];
+    try {
+      const Classroom = mongoose.model('Classroom');
+      rooms = await Classroom.find({ isAvailable: true }).lean();
+      console.log(`Found ${rooms.length} available classrooms`);
+    } catch (error) {
+      console.error('Error finding classrooms:', error);
+      // If Classroom model doesn't exist or other error, use some default rooms
+      rooms = [
+        { roomNumber: 'NC101', type: 'NC', capacity: 60 },
+        { roomNumber: 'NC102', type: 'NC', capacity: 60 },
+        { roomNumber: 'NR201', type: 'NR', capacity: 150 },
+        { roomNumber: 'NR202', type: 'NR', capacity: 150 },
+        { roomNumber: `${department.toUpperCase()}-101`, type: 'LAB', capacity: 30, department },
+      ];
+      console.log(`Using ${rooms.length} default classrooms`);
+    }
+    
+    // Define time slots available
+    const timeSlots = [
+      { start: '8 AM', end: '9 AM' },
+      { start: '9 AM', end: '10 AM' },
+      { start: '10 AM', end: '11 AM' },
+      { start: '11 AM', end: '12 PM' },
+      { start: '12 PM', end: '1 PM' },
+      { start: '2 PM', end: '3 PM' },
+      { start: '3 PM', end: '4 PM' },
+      { start: '4 PM', end: '5 PM' },
+      { start: '5 PM', end: '6 PM' }
+    ];
+    
+    // Days array used for generation
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    // Algorithm for assigning slots - improved to avoid conflicts
+    const createdTimetables = [];
+    const occupiedSlots = new Map(); // Map to track which room+day+time is occupied
+    
+    for (const course of courses) {
+      // Determine number of slots needed based on credits
+      const slotsCount = Math.max(1, Math.min(course.credits, 5));
+      
+      const timetable = new Timetable({
+        courseId: course._id,
+        slots: [],
+        semester,
+        year,
+        department
+      });
+      
+      console.log(`Creating timetable for ${course.courseCode} with ${slotsCount} slots`);
+      
+      // For each needed slot, pick a day, time and room that isn't already occupied
+      let assignedSlots = 0;
+      let attemptCount = 0; // Prevent infinite loops
+      
+      while (assignedSlots < slotsCount && attemptCount < 50) {
+        attemptCount++;
+        
+        const dayIndex = Math.floor(Math.random() * days.length);
+        const timeIndex = Math.floor(Math.random() * timeSlots.length);
+        const day = days[dayIndex];
+        const timeSlot = timeSlots[timeIndex];
+        
+        // Filter rooms based on course needs and prioritize department labs
+        let roomPool = [...rooms]; // Start with all rooms
+        
+        // If course has "LAB" in the name or code, prioritize lab rooms from the same department
+        if (course.courseCode.includes('LAB') || course.courseName.includes('Lab') || 
+            course.courseName.includes('Laboratory')) {
+          
+          // First try to find lab rooms of the same department
+          const departmentLabs = rooms.filter(room => 
+            room.type === 'LAB' && room.department === department
+          );
+          
+          if (departmentLabs.length > 0) {
+            // If department labs are available, only use those
+            roomPool = departmentLabs;
+            console.log(`  Using department lab rooms for ${course.courseCode}`);
+          } else {
+            // If no department labs, use any lab room
+            const allLabs = rooms.filter(room => room.type === 'LAB');
+            if (allLabs.length > 0) {
+              roomPool = allLabs;
+              console.log(`  No ${department} labs available, using other lab rooms`);
+            }
+            // If no labs at all, fall back to all rooms
+          }
+        }
+        
+        // Select a random room from the filtered pool
+        const roomIndex = Math.floor(Math.random() * roomPool.length);
+        const room = roomPool[roomIndex];
+        
+        // Create a unique key for this slot
+        const slotKey = `${day}-${timeSlot.start}-${room.roomNumber}`;
+        
+        // Check if this slot is already occupied
+        if (!occupiedSlots.has(slotKey)) {
+          // Slot is available, add it to the timetable
+          timetable.slots.push({
+            day,
+            startTime: timeSlot.start,
+            endTime: timeSlot.end,
+            roomNumber: room.roomNumber
+          });
+          
+          // Mark this slot as occupied
+          occupiedSlots.set(slotKey, course.courseCode);
+          assignedSlots++;
+          
+          console.log(`  Assigned slot ${assignedSlots}/${slotsCount}: ${day}, ${timeSlot.start}, Room ${room.roomNumber}`);
+        }
+      }
+      
+      if (assignedSlots < slotsCount) {
+        console.warn(`⚠️ Could only assign ${assignedSlots}/${slotsCount} slots for ${course.courseCode}`);
+      }
+      
+      await timetable.save();
+      createdTimetables.push(timetable);
+    }
+    
+    // Return the created timetables with course details populated
+    const populatedTimetables = await Timetable.find({ department })
+      .populate('courseId')
+      .lean();
     
     res.status(201).json({
-      message: `${regenerate ? 'Regenerated' : 'Generated'} timetables for ${createdTimetables.length} courses`,
-      timetables: createdTimetables
+      success: true,
+      message: `Created ${createdTimetables.length} timetables for department ${department}`,
+      timetables: populatedTimetables
     });
-  } catch (err) {
-    console.error('Error generating timetables:', err);
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    console.error('Failed to generate timetables:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate timetables',
+      error: error.message
+    });
   }
 });
 

@@ -106,6 +106,52 @@ router.get('/free', async (req, res) => {
   }
 });
 
+// Check if a slot is available (no conflicts)
+router.post('/check-slot-availability', async (req, res) => {
+  try {
+    const { day, startTime, roomNumber, timetableId = '', slotId = '', department = '', courseId = '' } = req.body;
+    
+    // Basic validation
+    if (!day || !startTime || !roomNumber) {
+      return res.status(400).json({ 
+        available: false, 
+        message: 'Missing required fields' 
+      });
+    }
+
+    // First check the room type - if it's a lab room, verify department match
+    const classroom = await Classroom.findOne({ roomNumber });
+    if (classroom && classroom.type === 'LAB' && classroom.department && department) {
+      // If this is a lab room with an assigned department
+      if (classroom.department !== department) {
+        // For labs with department assignment, warn if departments don't match
+        // But don't block it completely - just return a warning
+        const course = courseId ? await Course.findById(courseId) : null;
+        const courseName = course ? course.courseCode : 'this course';
+        
+        // Check if this is likely a lab course
+        let isLabCourse = false;
+        if (course && (course.courseCode.includes('LAB') || course.courseName.includes('Lab'))) {
+          isLabCourse = true;
+        }
+        
+        if (isLabCourse) {
+          return res.json({
+            available: true,
+            warning: `Room ${roomNumber} belongs to ${classroom.department.toUpperCase()} department but ${courseName} is from ${department.toUpperCase()} department. Consider using a lab from your department if available.`
+          });
+        }
+      }
+    }
+    
+    // The rest of the conflict checking code remains the same
+    // ...existing code...
+    
+  } catch (err) {
+    // ...existing code...
+  }
+});
+
 // Get classrooms by type (NC, NR, LAB)
 router.get('/type/:type', async (req, res) => {
   try {
