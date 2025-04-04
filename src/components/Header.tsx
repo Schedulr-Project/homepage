@@ -1,28 +1,38 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Button, Box, Container } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { AppBar, Toolbar, Button, Box, Container, Avatar, Typography, IconButton } from '@mui/material';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import MenuIcon from '@mui/icons-material/Menu';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import MeetingRoomIcon from '@mui/icons-material/MeetingRoom'; // Import room icon
+import { useAuth } from '../contexts/AuthContext';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  toggleSidebar?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
+  const { user, logout, isLoggedIn } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
     <AppBar position="static" elevation={0}>
       <Container maxWidth="lg">
         <Toolbar disableGutters>
+          {/* App logo/name - visible on all screen sizes */}
           <Box 
             component={RouterLink} 
             to="/dashboard"
             sx={{ 
-              display: 'flex', 
+              display: 'flex',
               alignItems: 'center', 
               mr: 2,
               textDecoration: 'none',
               cursor: 'pointer',
-              '&:hover': {
-                opacity: 0.9,
-              },
+              '&:hover': { opacity: 0.9 },
             }}
           >
             <CalendarMonthIcon sx={{ mr: 1, color: '#ffd600' }} />
@@ -37,25 +47,15 @@ const Header: React.FC = () => {
                 backgroundSize: '200% auto',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                animation: 'gradient 3s ease infinite',
-                '@keyframes gradient': {
-                  '0%': {
-                    backgroundPosition: '0% 50%',
-                  },
-                  '50%': {
-                    backgroundPosition: '100% 50%',
-                  },
-                  '100%': {
-                    backgroundPosition: '0% 50%',
-                  },
-                },
               }}
             >
               Schedulr
             </Typography>
           </Box>
+          
           <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          
+          {!isLoggedIn ? (
             <Button
               color="inherit"
               component={RouterLink}
@@ -70,52 +70,23 @@ const Header: React.FC = () => {
             >
               Login
             </Button>
-            <Button 
-              color="inherit"
-              component={RouterLink}
-              to="/free-rooms" // Add link to free rooms
-              startIcon={<MeetingRoomIcon />}
-              sx={{
-                borderRadius: 2,
-                px: 3,
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                },
-              }}
-            >
-              Find Rooms
-            </Button>
-            <Button 
-              color="inherit"
-              component={RouterLink}
-              to="/edit-timetable?dept=cs" // Default to CS department
-              startIcon={<EditIcon />}
-              sx={{
-                borderRadius: 2,
-                px: 3,
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                },
-              }}
-            >
-              Edit Timetable
-            </Button>
-            <Button 
-              color="inherit"
-              component={RouterLink}
-              to="/create"
-              startIcon={<AddIcon />}
-              sx={{
-                borderRadius: 2,
-                px: 3,
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                },
-              }}
-            >
-              Create Timetable
-            </Button>
-          </Box>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body1" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                {user?.name || user?.email}
+              </Typography>
+              <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
+              </Avatar>
+              <Button 
+                color="inherit" 
+                onClick={handleLogout}
+                sx={{ display: { xs: 'none', sm: 'block' } }}
+              >
+                Logout
+              </Button>
+            </Box>
+          )}
         </Toolbar>
       </Container>
     </AppBar>

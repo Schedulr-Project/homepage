@@ -1,6 +1,60 @@
 import axios from 'axios';
+import { getToken } from './auth';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_URL
+});
+
+// Add request interceptor to include auth token with all API requests
+// Fix TypeScript errors by explicitly typing parameters as 'any'
+api.interceptors.request.use(
+  function(config: any): any {
+    const token = getToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  function(error: any): any {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor to handle auth errors
+// Fix TypeScript errors by explicitly typing parameters as 'any'
+api.interceptors.response.use(
+  function(response: any): any {
+    return response;
+  },
+  function(error: any): any {
+    // Handle 401 Unauthorized error by redirecting to login
+    if (error.response && error.response.status === 401) {
+      if (!window.location.pathname.includes('login')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Add a flag to show all network requests in console
+const DEBUG_API = true;
+
+// Enhance the API instance with request/response logging
+if (DEBUG_API) {
+  console.log('API debugging enabled');
+  
+  // Debug requests
+  const originalRequest = api.request;
+  api.request = function(...args: any[]) {
+    console.log('🌐 API Request:', args[0]?.method?.toUpperCase(), args[0]?.url);
+    if (args[0]?.data) console.log('📤 Request Data:', args[0].data);
+    return originalRequest.apply(this, args);
+  };
+}
 
 export interface Course {
   _id?: string;
@@ -46,7 +100,7 @@ export interface Classroom {
 // Course API calls
 export const getCourses = async () => {
   try {
-    const response = await axios.get(`${API_URL}/courses`);
+    const response = await api.get('/courses');
     return response.data;
   } catch (error) {
     console.error('Error fetching courses:', error);
@@ -56,7 +110,7 @@ export const getCourses = async () => {
 
 export const getCoursesByDepartment = async (department: string) => {
   try {
-    const response = await axios.get(`${API_URL}/courses/department/${department}`);
+    const response = await api.get(`/courses/department/${department}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching courses for department ${department}:`, error);
@@ -66,7 +120,7 @@ export const getCoursesByDepartment = async (department: string) => {
 
 export const getCourse = async (id: string) => {
   try {
-    const response = await axios.get(`${API_URL}/courses/${id}`);
+    const response = await api.get(`/courses/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching course ${id}:`, error);
@@ -76,7 +130,7 @@ export const getCourse = async (id: string) => {
 
 export const createCourse = async (course: Course) => {
   try {
-    const response = await axios.post(`${API_URL}/courses`, course);
+    const response = await api.post('/courses', course);
     return response.data;
   } catch (error) {
     console.error('Error creating course:', error);
@@ -86,7 +140,7 @@ export const createCourse = async (course: Course) => {
 
 export const updateCourse = async (id: string, course: Course) => {
   try {
-    const response = await axios.put(`${API_URL}/courses/${id}`, course);
+    const response = await api.put(`/courses/${id}`, course);
     return response.data;
   } catch (error) {
     console.error(`Error updating course ${id}:`, error);
@@ -96,7 +150,7 @@ export const updateCourse = async (id: string, course: Course) => {
 
 export const deleteCourse = async (id: string) => {
   try {
-    const response = await axios.delete(`${API_URL}/courses/${id}`);
+    const response = await api.delete(`/courses/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting course ${id}:`, error);
@@ -107,7 +161,7 @@ export const deleteCourse = async (id: string) => {
 // Timetable API calls
 export const getTimetables = async () => {
   try {
-    const response = await axios.get(`${API_URL}/timetables`);
+    const response = await api.get('/timetables');
     return response.data;
   } catch (error) {
     console.error('Error fetching timetables:', error);
@@ -117,7 +171,7 @@ export const getTimetables = async () => {
 
 export const getTimetableForCourse = async (courseId: string) => {
   try {
-    const response = await axios.get(`${API_URL}/timetables/course/${courseId}`);
+    const response = await api.get(`/timetables/course/${courseId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching timetable for course ${courseId}:`, error);
@@ -127,7 +181,7 @@ export const getTimetableForCourse = async (courseId: string) => {
 
 export const getTimetablesByDepartment = async (department: string) => {
   try {
-    const response = await axios.get(`${API_URL}/timetables/department/${department}`);
+    const response = await api.get(`/timetables/department/${department}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching timetables for department ${department}:`, error);
@@ -137,7 +191,7 @@ export const getTimetablesByDepartment = async (department: string) => {
 
 export const createTimetable = async (timetable: Timetable) => {
   try {
-    const response = await axios.post(`${API_URL}/timetables`, timetable);
+    const response = await api.post('/timetables', timetable);
     return response.data;
   } catch (error) {
     console.error('Error creating timetable:', error);
@@ -147,7 +201,7 @@ export const createTimetable = async (timetable: Timetable) => {
 
 export const updateTimetable = async (id: string, timetable: Partial<Timetable>) => {
   try {
-    const response = await axios.put(`${API_URL}/timetables/${id}`, timetable);
+    const response = await api.put(`/timetables/${id}`, timetable);
     return response.data;
   } catch (error) {
     console.error(`Error updating timetable ${id}:`, error);
@@ -157,7 +211,7 @@ export const updateTimetable = async (id: string, timetable: Partial<Timetable>)
 
 export const deleteTimetable = async (id: string) => {
   try {
-    const response = await axios.delete(`${API_URL}/timetables/${id}`);
+    const response = await api.delete(`/timetables/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error deleting timetable ${id}:`, error);
@@ -173,7 +227,7 @@ export const generateTimetables = async (data: {
   regenerate?: boolean; // Add this optional flag
 }) => {
   try {
-    const response = await axios.post(`${API_URL}/timetables/generate`, data);
+    const response = await api.post('/timetables/generate', data);
     return response.data;
   } catch (error) {
     console.error('Error generating timetables:', error);
@@ -196,12 +250,12 @@ export const updateTimetableSlot = async (data: {
   try {
     if (data.isNewSlot) {
       // Creating a new slot (either adding to existing timetable or creating new one)
-      const response = await axios.post(`${API_URL}/timetables/slot`, data);
+      const response = await api.post('/timetables/slot', data);
       return response.data;
     } else {
       // Updating an existing slot
-      const response = await axios.put(
-        `${API_URL}/timetables/${data.timetableId}/slot/${data.slotId}`, 
+      const response = await api.put(
+        `/timetables/${data.timetableId}/slot/${data.slotId}`, 
         data
       );
       return response.data;
@@ -215,7 +269,7 @@ export const updateTimetableSlot = async (data: {
 // Delete a specific timetable slot
 export const deleteTimetableSlot = async (timetableId: string, slotId: string) => {
   try {
-    const response = await axios.delete(`${API_URL}/timetables/${timetableId}/slot/${slotId}`);
+    const response = await api.delete(`/timetables/${timetableId}/slot/${slotId}`);
     return response.data;
   } catch (error) {
     console.error('Error deleting timetable slot:', error);
@@ -233,7 +287,7 @@ export const checkSlotAvailability = async (data: {
   department?: string; // Add department parameter
 }) => {
   try {
-    const response = await axios.post(`${API_URL}/timetables/check-slot-availability`, data);
+    const response = await api.post('/timetables/check-slot-availability', data);
     return response.data;
   } catch (error) {
     console.error('Error checking slot availability:', error);
@@ -244,7 +298,7 @@ export const checkSlotAvailability = async (data: {
 // Classroom API calls
 export const getClassrooms = async () => {
   try {
-    const response = await axios.get(`${API_URL}/classrooms`);
+    const response = await api.get('/classrooms');
     return response.data;
   } catch (error) {
     console.error('Error fetching classrooms:', error);
@@ -254,7 +308,7 @@ export const getClassrooms = async () => {
 
 export const getClassroomsByType = async (type: 'NC' | 'NR' | 'LAB') => {
   try {
-    const response = await axios.get(`${API_URL}/classrooms/type/${type}`);
+    const response = await api.get(`/classrooms/type/${type}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching ${type} classrooms:`, error);
@@ -264,7 +318,7 @@ export const getClassroomsByType = async (type: 'NC' | 'NR' | 'LAB') => {
 
 export const getClassroomsByDepartment = async (department: string) => {
   try {
-    const response = await axios.get(`${API_URL}/classrooms/department/${department}`);
+    const response = await api.get(`/classrooms/department/${department}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching classrooms for department ${department}:`, error);
@@ -274,7 +328,7 @@ export const getClassroomsByDepartment = async (department: string) => {
 
 export const getClassroom = async (roomNumber: string) => {
   try {
-    const response = await axios.get(`${API_URL}/classrooms/${roomNumber}`);
+    const response = await api.get(`/classrooms/${roomNumber}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching classroom ${roomNumber}:`, error);
@@ -286,7 +340,7 @@ export const getClassroom = async (roomNumber: string) => {
 export const getFreeRooms = async (day: string, timeSlot: string, timestamp?: number) => {
   try {
     console.log(`API call: Fetching free rooms for ${day} at ${timeSlot}`);
-    const response = await axios.get(`${API_URL}/classrooms/free`, {
+    const response = await api.get('/classrooms/free', {
       params: { 
         day, 
         timeSlot,
@@ -327,5 +381,55 @@ export const getFreeRooms = async (day: string, timeSlot: string, timestamp?: nu
       // Something happened in setting up the request that triggered an Error
       throw new Error('An unexpected error occurred');
     }
+  }
+};
+
+// Auth API calls
+export const registerUser = async (userData: {
+  name: string;
+  email: string;
+  password: string;
+}) => {
+  try {
+    const response = await api.post('/auth/register', userData);
+    return response.data;
+  } catch (error) {
+    console.error('Error registering user:', error);
+    throw error;
+  }
+};
+
+export const loginUser = async (credentials: {
+  email: string;
+  password: string;
+}) => {
+  try {
+    console.log('API: Attempting login for', credentials.email);
+    const response = await api.post('/auth/login', credentials);
+    console.log('API: Login response received');
+    return response.data;
+  } catch (error) {
+    console.error('API: Login failed:', error);
+    throw error;
+  }
+};
+
+export const logoutUser = async () => {
+  try {
+    const response = await api.post('/auth/logout');
+    return response.data;
+  } catch (error) {
+    console.error('Error logging out:', error);
+    throw error;
+  }
+};
+
+export const getCurrentUser = async () => {
+  try {
+    const response = await api.get('/auth/me');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    throw error;
   }
 };

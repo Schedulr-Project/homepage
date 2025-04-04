@@ -1,0 +1,119 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  background: url("../bgpic.PNG") no-repeat; /* Updated to correct image path */
+  background-size: cover;
+  background-position: center;
+}
+
+.wrapper {
+  width: 420px;
+  background: transparent;
+  border: 2px solid rgba(255,255,255,.2);
+  backdrop-filter: blur(30px);
+  box-shadow: 0 0 10px rgba(0,0,0,.2);
+  color: white;
+  border-radius: 10px;
+  padding: 30px 40px;
+}
+
+.wrapper h1 {
+  font-size: 36px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.wrapper .input-box {
+  position: relative;
+  width: 100%;
+  height: 50px;
+  margin: 30px 0px;
+}
+
+.input-box input {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: 2px solid rgba(255,255,255,.2);
+  outline: none;
+  border-radius: 40px;
+  font-size: 16px;
+  color: white;
+  padding: 20px 45px 20px 20px;
+}
+
+.input-box input::placeholder {
+  color: white;
+}
+
+.input-box .icon {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+.wrapper .remember-forgot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14.5px;
+  margin: -15px 0 15px;
+}
+
+.remember-forgot label input {
+  accent-color: white;
+  margin-right: 4px;
+}
+
+.text-button {
+  background: none;
+  border: none;
+  color: white;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+.register-button {
+  padding-left: 5px;
+}
+
+.wrapper button[type="submit"] {
+  width: 100%;
+  height: 45px;
+  background: white;
+  border: none;
+  outline: none;
+  border-radius: 40px;
+  box-shadow: 0 0 10px rgba(0,0,0,.1);
+  cursor: pointer;
+  font-size: 16px;
+  color: #333;
+  font-weight: 700;
+}
+
+.wrapper button[type="submit"]:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.wrapper .register-link {
+  font-size: 14.5px;
+  text-align: center;
+  margin: 20px 0 15px;
+}
+
+.wrapper .test-account {
+  font-size: 14px;
+  text-align: center;
+  margin: 15px 0 0;
+  color: rgba(255, 255, 255, 0.7);
+}
