@@ -17,12 +17,27 @@
      ```
 
    - **Environment Variables:**
-     - `NODE_ENV=production`
+     - `NODE_ENV=production` (critical for serving frontend files)
      - `MONGODB_URI=<your-mongodb-connection-string>`
      - `JWT_SECRET=<your-jwt-secret>`
      - `SKIP_TYPESCRIPT=true`
 
 4. Click "Create Web Service"
+
+5. **Important:** Make sure your backend/server.js file correctly serves the React build files in production mode with:
+   ```javascript
+   if (process.env.NODE_ENV === 'production') {
+     const buildPath = path.join(__dirname, '..', 'build');
+     app.use(express.static(buildPath));
+     app.get('*', (req, res, next) => {
+       if (!req.path.startsWith('/api')) {
+         res.sendFile(path.join(buildPath, 'index.html'));
+       } else {
+         next();
+       }
+     });
+   }
+   ```
 
 ## Troubleshooting
 

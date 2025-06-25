@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const mongoose = require('mongoose');
 const path = require('path');
 const dotenv = require('dotenv');
@@ -41,9 +40,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Health check endpoints for testing
+// Health check endpoint (only used when not in production)
 app.get('/', (req, res) => {
-  res.send('Schedulr API server is running!');
+  // In production, this route will be overridden by the catch-all handler that serves React
+  if (process.env.NODE_ENV !== 'production') {
+    res.send('Schedulr API server is running!');
+  } else {
+    // In production, let the React app handle the root route
+    res.sendFile(path.join(__dirname, '..', 'build', 'index.html'));
+  }
 });
 
 // Register health check routes
@@ -64,7 +69,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add a simple health check endpoint that doesn't require database access
+// Root health check endpoint that doesn't require database access
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -104,12 +109,13 @@ mongoose
       app.use(express.static(buildPath));
 
       // Catch-all: send index.html for any route not handled above
-      app.get('*', (req, res) => {
+      app.get('*', (req, res, next) => {
         // Only serve index.html if the request is not for an API route
         if (!req.path.startsWith('/api')) {
           res.sendFile(path.join(buildPath, 'index.html'));
         } else {
-          res.status(404).json({ error: 'API route not found' });
+          // Pass API routes to the next middleware
+          next();
         }
       });
     }
@@ -146,22 +152,6 @@ app.post('/api/auth/register-test', (req, res) => {
 app.get('/test', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test.html'));
 });
-
-if (process.env.NODE_ENV === 'production') {
-  // Serve static files from the React build
-  app.use(express.static(path.join(__dirname, '../build')));
-  
-  // For all other GET requests, serve the React app (let React router handle the routing)
-  app.get('*', (req, res) => {
-    // Skip API routes
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, '../build', 'index.html'));
-    } else {
-      // Let API routes fall through to next middleware
-      next();
-    }
-  });
-}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
