@@ -6,37 +6,49 @@ const { authenticateUser } = require('../middleware/auth');
 // Register a new user
 router.post('/register', async (req, res) => {
   try {
+    console.log('Register request received:', req.body);
     const { name, email, password } = req.body;
     
-    // Check if email is already registered
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    // Check if required fields are provided
+    if (!name || !email || !password) {
+      console.log('Missing required fields:', { name, email, password: password ? 'provided' : 'missing' });
       return res.status(400).json({
         success: false,
-        message: 'Email already registered',
+        message: 'Please provide name, email, and password'
       });
     }
     
-    // Create new user
-    const user = await User.create({ name, email, password });
+    // Check if user with the same email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      console.log('User already exists:', email);
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email already exists'
+      });
+    }
     
-    // Generate token
-    const token = user.generateToken();
+    // Create a new user
+    const user = new User({
+      name,
+      email,
+      password, // Will be hashed by pre-save hook in User model
+      role: 'user' // Default role
+    });
+    
+    await user.save();
+    console.log('User registered successfully:', email);
     
     res.status(201).json({
       success: true,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      token,
+      message: 'User registered successfully'
     });
-  } catch (error) {
+  } catch (err) {
+    console.error('Error in user registration:', err);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: 'Failed to register user',
+      error: err.message
     });
   }
 });

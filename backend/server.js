@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 const dotenv = require('dotenv');
 const authRoutes = require('./routes/auth');
 const courseRoutes = require('./routes/courseRoutes');
@@ -13,15 +14,53 @@ dotenv.config();
 // Create Express app
 const app = express();
 
-// Configure CORS with more specific settings
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'], // Add your frontend URL
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Logging middleware for all requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
+// CORS middleware - must come before routes
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('Responding to OPTIONS request');
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Set up middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check endpoints for testing
+app.get('/', (req, res) => {
+  res.send('Schedulr API server is running!');
+});
+
+// Register health check routes
+const healthCheckRoutes = require('./routes/health-check');
+app.use('/api/health', healthCheckRoutes);
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Backend server is working!', 
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// Add logging middleware for requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // Add a simple health check endpoint that doesn't require database access
 app.get('/api/health', (req, res) => {
@@ -70,6 +109,26 @@ mongoose
     });
   });
 
+// Create a test endpoint to verify the server is working
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Backend server is working!' });
+});
+
+// Manual registration endpoint for testing
+app.post('/api/auth/register-test', (req, res) => {
+  console.log('Register test endpoint hit with body:', req.body);
+  res.status(201).json({
+    success: true,
+    message: 'Test registration endpoint working!',
+    receivedData: req.body
+  });
+});
+
+// Test page route
+app.get('/test', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test.html'));
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Global error handler caught:', err);
@@ -80,15 +139,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server with better logging
+// Start server - bind to all network interfaces instead of just localhost
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`API available at http://localhost:${PORT}/api`);
+  console.log(`Test page available at http://localhost:${PORT}/test`);
 });
 
 // Handle server startup errors
-server.on('error', (error) => {
+app.on('error', function(error) {
   if (error.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is already in use. Please choose another port.`);
   } else {

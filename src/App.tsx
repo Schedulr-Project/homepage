@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Table from './components/timetable/Table';
 import TimetableGenerator from './components/timetable/TimetableGenerator';
 import EditTimetable from './components/timetable/EditTimetable';
@@ -43,6 +44,7 @@ function App() {
               >
                 <Routes>
                   <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
                   <Route path="/" element={
                     <ProtectedRoute>
                       <Dashboard />

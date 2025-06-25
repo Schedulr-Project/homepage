@@ -3,7 +3,7 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import PersonIcon from '@mui/icons-material/Person';
 import LockIcon from '@mui/icons-material/Lock';
@@ -34,7 +34,7 @@ const Login: React.FC = () => {
     setError('Password reset functionality is not implemented yet.');
   };
 
-  // Handle "register" click
+  // Handle "register" click - replace this with Link to Register
   const handleRegister = (event: React.MouseEvent) => {
     event.preventDefault();
     setError('Registration functionality is not implemented yet. Use the test account.');
@@ -151,14 +151,9 @@ const Login: React.FC = () => {
           <div className="register-link">
             <p>
               Don't have an account? 
-              <button 
-                type="button" 
-                onClick={handleRegister}
-                className="text-button register-button"
-                disabled={loading || isLoggedIn}
-              >
+              <Link to="/register" className="text-button register-button">
                 Register
-              </button>
+              </Link>
             </p>
           </div>
         </form>

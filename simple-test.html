@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <p>This page tests the connection to your backend API. Open your browser console to see detailed request information.</p>
+
+    <div class="panel">
+        <h2>1. Test Main Server</h2>
+        <button onclick="testEndpoint('http://localhost:5000/', 'main-result')">Test Main Server</button>
+        <pre id="main-result">Results will appear here...</pre>
+    </div>
+
+    <div class="panel">
+        <h2>2. Test API Health</h2>
+        <button onclick="testEndpoint('http://localhost:5000/api/health', 'api-result')">Test API Health</button>
+        <pre id="api-result">Results will appear here...</pre>
+    </div>
+
+    <div class="panel">
+        <h2>3. Test Simple Registration</h2>
+        <form id="test-form">
+            <div>
+                <label for="name">Name:</label><br>
+                <input type="text" id="name" name="name" value="Test User" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+            </div>
+            <div>
+                <label for="email">Email:</label><br>
+                <input type="email" id="email" name="email" value="test@example.com" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+            </div>
+            <div>
+                <label for="password">Password:</label><br>
+                <input type="password" id="password" name="password" value="password123" style="width: 100%; margin-bottom: 10px; padding: 5px;">
+            </div>
+            <button type="button" onclick="testRegistration()">Test Registration</button>
+        </form>
+        <pre id="register-result">Results will appear here...</pre>
+    </div>
+
+    <div class="panel">
+        <h2>4. Try Alternative Port</h2>
+        <p>If port 5000 doesn't work, try an alternative port:</p>
+        <button onclick="testEndpoint('http://localhost:8080/', 'alt-result')">Test Port 8080</button>
+        <pre id="alt-result">Results will appear here...</pre>
+    </div>
+
+    <script>
+        async function testEndpoint(url, resultId) {
+            const resultElement = document.getElementById(resultId);
+            resultElement.className = '';
+            resultElement.textContent = 'Testing connection to ' + url + '...';
+            
+            try {
+                console.log('Fetching:', url);
+                const startTime = new Date();
+                
+                const response = await fetch(url);
+                const endTime = new Date();
+                const timeMs = endTime - startTime;
+                
+                console.log('Response status:', response.status);
+                let data;
+                
+                try {
+                    // Try to parse as JSON
+                    data = await response.json();
+                    console.log('Response data:', data);
+                    resultElement.className = 'success';
+                    resultElement.textContent = `Success! (${timeMs}ms)\n${JSON.stringify(data, null, 2)}`;
+                } catch (e) {
+                    // If not JSON, get as text
+                    const text = await response.text();
+                    console.log('Response text:', text);
+                    resultElement.className = 'success';
+                    resultElement.textContent = `Success! (${timeMs}ms)\n${text}`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultElement.className = 'error';
+                resultElement.textContent = `Error: ${error.message}\n\nPossible causes:\n- Server not running\n- CORS issues\n- Network connectivity problems`;
+            }
+        }
+
+        async function testRegistration() {
+            const resultElement = document.getElementById('register-result');
+            resultElement.className = '';
+            resultElement.textContent = 'Testing registration...';
+            
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                console.log('Sending registration test to: http://localhost:5000/api/auth/register');
+                console.log('With data:', { name, email, password });
+                
+                const response = await fetch('http://localhost:5000/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+                
+                console.log('Registration response status:', response.status);
+                const data = await response.json();
+                console.log('Registration response data:', data);
+                
+                resultElement.className = 'success';
+                resultElement.textContent = `Registration request completed!\n${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                console.error('Registration error:', error);
+                resultElement.className = 'error';
+                resultElement.textContent = `Registration error: ${error.message}\n\nAlternative methods:\n1. Try using the test-server.js\n2. Check your browser console for more details`;
+            }
+        }
+    </script>
+</body>
+</html>

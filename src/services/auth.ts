@@ -1,4 +1,5 @@
 import { loginUser, logoutUser, getCurrentUser as fetchCurrentUser } from './api';
+import axios from 'axios';
 
 interface User {
   _id: string;
@@ -10,6 +11,11 @@ interface AuthResponse {
   success: boolean;
   user?: User;
   token?: string;
+  message?: string;
+}
+
+interface RegisterResponse {
+  success: boolean;
   message?: string;
 }
 
@@ -107,6 +113,49 @@ export const getCurrentUser = (): User | null => {
   } catch (e) {
     logout(); // Clear invalid data
     return null;
+  }
+};
+
+/**
+ * Register a new user
+ */
+export const register = async (name: string, email: string, password: string): Promise<RegisterResponse> => {
+  console.log('Auth service: Sending registration request to server');
+  try {
+    const directUrl = 'http://localhost:5000/api/auth/register';
+    console.log('Making direct request to:', directUrl);
+    
+    const response = await axios.post(directUrl, { name, email, password }, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    console.log('Auth service: Registration successful:', response.data);
+    
+    if (response.data && response.data.success) {
+      return {
+        success: true,
+        message: response.data.message || 'Registration successful!'
+      };
+    }
+    
+    return {
+      success: false,
+      message: response.data.message || 'Registration failed'
+    };
+  } catch (error: any) {
+    console.error('Auth service: Registration error:', error);
+    
+    if (error.code === 'ERR_NETWORK') {
+      return {
+        success: false,
+        message: 'Cannot connect to server. Please check your network connection and try again.'
+      };
+    }
+    
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Registration failed. Please try again.'
+    };
   }
 };
 

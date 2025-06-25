@@ -1,35 +1,52 @@
 import axios from 'axios';
 import { getToken } from './auth';
 
+// Define API URL based on environment
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Create axios instance with default config
+console.log('Using API URL:', API_URL);
+
+// Create axios instance with base URL and default headers
 const api = axios.create({
-  baseURL: API_URL
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  // Set longer timeout for slow connections
+  timeout: 10000
 });
 
 // Add request interceptor to include auth token with all API requests
-// Fix TypeScript errors by explicitly typing parameters as 'any'
 api.interceptors.request.use(
   function(config: any): any {
     const token = getToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Log outgoing requests in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🚀 Request: ${config.method?.toUpperCase()} ${config.url}`, config);
+    }
+    
     return config;
   },
   function(error: any): any {
+    console.error('Request error:', error);
     return Promise.reject(error);
   }
 );
 
-// Add response interceptor to handle auth errors
-// Fix TypeScript errors by explicitly typing parameters as 'any'
+// Add response interceptor for better error handling
 api.interceptors.response.use(
   function(response: any): any {
     return response;
   },
   function(error: any): any {
+    if (error.message === 'Network Error') {
+      console.error('Network Error. Check if backend server is running and CORS is configured properly.');
+    }
+    
     // Handle 401 Unauthorized error by redirecting to login
     if (error.response && error.response.status === 401) {
       if (!window.location.pathname.includes('login')) {
@@ -40,20 +57,10 @@ api.interceptors.response.use(
   }
 );
 
-// Add a flag to show all network requests in console
-const DEBUG_API = true;
-
-// Enhance the API instance with request/response logging
-if (DEBUG_API) {
+// Enable console debugging in development
+if (process.env.NODE_ENV === 'development') {
   console.log('API debugging enabled');
-  
-  // Debug requests
-  const originalRequest = api.request;
-  api.request = function(...args: any[]) {
-    console.log('🌐 API Request:', args[0]?.method?.toUpperCase(), args[0]?.url);
-    if (args[0]?.data) console.log('📤 Request Data:', args[0].data);
-    return originalRequest.apply(this, args);
-  };
+  console.log('API URL:', API_URL);
 }
 
 export interface Course {
@@ -433,3 +440,5 @@ export const getCurrentUser = async () => {
     throw error;
   }
 };
+
+export default api;

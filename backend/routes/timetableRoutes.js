@@ -173,6 +173,12 @@ router.post('/generate', authenticateUser, async (req, res) => {
       { start: '5 PM', end: '6 PM' }
     ];
     
+    // Define special lab time slots (3-hour blocks)
+    const labTimeSlots = [
+      { start: '2 PM', end: '5 PM' },
+      { start: '9 AM', end: '12 PM' },
+    ];
+    
     // Days array used for generation
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     
@@ -181,8 +187,11 @@ router.post('/generate', authenticateUser, async (req, res) => {
     const occupiedSlots = new Map(); // Map to track which room+day+time is occupied
     
     for (const course of courses) {
-      // Determine number of slots needed based on credits
-      const slotsCount = Math.max(1, Math.min(course.credits, 5));
+      // Simplified logic: ALL 2-credit courses are lab courses
+      const isLabCourse = course.credits === 2;
+      
+      // For lab courses, create one 3-hour slot instead of multiple 1-hour slots
+      const slotsCount = isLabCourse ? 1 : Math.max(1, Math.min(course.credits, 5));
       
       const timetable = new Timetable({
         courseId: course._id,
@@ -192,7 +201,7 @@ router.post('/generate', authenticateUser, async (req, res) => {
         department
       });
       
-      console.log(`Creating timetable for ${course.courseCode} with ${slotsCount} slots`);
+      console.log(`Creating timetable for ${course.courseCode} with ${slotsCount} slots${isLabCourse ? ' (LAB COURSE)' : ''}`);
       
       // For each needed slot, pick a day, time and room that isn't already occupied
       let assignedSlots = 0;
@@ -202,17 +211,18 @@ router.post('/generate', authenticateUser, async (req, res) => {
         attemptCount++;
         
         const dayIndex = Math.floor(Math.random() * days.length);
-        const timeIndex = Math.floor(Math.random() * timeSlots.length);
         const day = days[dayIndex];
-        const timeSlot = timeSlots[timeIndex];
+        
+        // Use lab time slots for lab courses, regular time slots otherwise
+        const availableTimeSlots = isLabCourse ? labTimeSlots : timeSlots;
+        const timeIndex = Math.floor(Math.random() * availableTimeSlots.length);
+        const timeSlot = availableTimeSlots[timeIndex];
         
         // Filter rooms based on course needs and prioritize department labs
         let roomPool = [...rooms]; // Start with all rooms
         
-        // If course has "LAB" in the name or code, prioritize lab rooms from the same department
-        if (course.courseCode.includes('LAB') || course.courseName.includes('Lab') || 
-            course.courseName.includes('Laboratory')) {
-          
+        // For ALL lab courses (2-credit courses), only use LAB rooms
+        if (isLabCourse) {
           // First try to find lab rooms of the same department
           const departmentLabs = rooms.filter(room => 
             room.type === 'LAB' && room.department === department
@@ -240,8 +250,27 @@ router.post('/generate', authenticateUser, async (req, res) => {
         // Create a unique key for this slot
         const slotKey = `${day}-${timeSlot.start}-${room.roomNumber}`;
         
+        // For 3-hour lab slots, check if any of the hours conflict with existing slots
+        let hasConflict = false;
+        
+        if (isLabCourse) {
+          // For lab courses, need to check all hours in the 3-hour block
+          const startHour = parseInt(timeSlot.start.split(' ')[0]);
+          for (let h = 0; h < 3; h++) {
+            const hourToCheck = `${startHour + h} ${timeSlot.start.split(' ')[1]}`;
+            const hourKey = `${day}-${hourToCheck}-${room.roomNumber}`;
+            if (occupiedSlots.has(hourKey)) {
+              hasConflict = true;
+              break;
+            }
+          }
+        } else {
+          // For regular courses, just check the exact time slot
+          hasConflict = occupiedSlots.has(slotKey);
+        }
+        
         // Check if this slot is already occupied
-        if (!occupiedSlots.has(slotKey)) {
+        if (!hasConflict) {
           // Slot is available, add it to the timetable
           timetable.slots.push({
             day,
@@ -250,11 +279,22 @@ router.post('/generate', authenticateUser, async (req, res) => {
             roomNumber: room.roomNumber
           });
           
-          // Mark this slot as occupied
-          occupiedSlots.set(slotKey, course.courseCode);
+          // Mark this slot (and adjacent slots for labs) as occupied
+          if (isLabCourse) {
+            // Mark all hours in the lab slot as occupied
+            const startHour = parseInt(timeSlot.start.split(' ')[0]);
+            for (let h = 0; h < 3; h++) {
+              const hourToMark = `${startHour + h} ${timeSlot.start.split(' ')[1]}`;
+              const hourKey = `${day}-${hourToMark}-${room.roomNumber}`;
+              occupiedSlots.set(hourKey, course.courseCode);
+            }
+          } else {
+            occupiedSlots.set(slotKey, course.courseCode);
+          }
+          
           assignedSlots++;
           
-          console.log(`  Assigned slot ${assignedSlots}/${slotsCount}: ${day}, ${timeSlot.start}, Room ${room.roomNumber}`);
+          console.log(`  Assigned slot ${assignedSlots}/${slotsCount}: ${day}, ${timeSlot.start}-${timeSlot.end}, Room ${room.roomNumber}`);
         }
       }
       
