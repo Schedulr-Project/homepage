@@ -2,7 +2,10 @@ import axios from 'axios';
 import { getToken } from './auth';
 
 // Define API URL based on environment
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// In production, use a relative URL to avoid CORS issues when backend serves frontend
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? '/api'  // Use relative path in production
+  : (process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
 
 console.log('Using API URL:', API_URL);
 

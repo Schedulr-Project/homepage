@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper, Button, Alert, CircularProgress } from '@mui/material';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// In production, use a relative URL to avoid CORS issues
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? '/api'
+  : (process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
 
 interface ConnectionStatus {
   health: boolean;

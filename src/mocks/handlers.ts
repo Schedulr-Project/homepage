@@ -2,7 +2,10 @@ import { rest, RestHandler } from 'msw';
 import { mockCourses, mockTimetables, mockClassrooms } from './mockData'; // Ensure './mockData' exists and is correctly typed
 import { Course, TimeSlot, Classroom } from '../services/api'; // Ensure '../services/api' exports these types
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// In production, use a relative URL to avoid CORS issues
+const API_URL = process.env.NODE_ENV === 'production' 
+  ? '/api'
+  : (process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
 
 export const handlers: RestHandler[] = [
   rest.get(`${API_URL}/courses`, (req, res, ctx) => {

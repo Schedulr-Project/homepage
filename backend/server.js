@@ -21,7 +21,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS middleware - must come before routes
+// Better CORS setup using the cors package
+app.use(cors({
+  origin: '*', // Allow all origins - in production, the frontend and backend are served from the same origin
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  credentials: true // Allow cookies if needed
+}));
+
+// Legacy CORS headers as fallback
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
