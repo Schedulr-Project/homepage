@@ -1,0 +1,5 @@
+// This file is included in the .gitignore
+// It contains the Render build command for reference
+
+// In the Render dashboard, update your build command to:
+// SKIP_TYPESCRIPT=true npm install && SKIP_TYPESCRIPT=true npm run build && cd backend && npm install
