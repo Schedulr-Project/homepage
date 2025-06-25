@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const mongoose = require('mongoose');
 const path = require('path');
 const dotenv = require('dotenv');
@@ -7,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const courseRoutes = require('./routes/courseRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
+
 
 // Load environment variables
 dotenv.config();
@@ -144,6 +146,22 @@ app.post('/api/auth/register-test', (req, res) => {
 app.get('/test', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test.html'));
 });
+
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the React build
+  app.use(express.static(path.join(__dirname, '../build')));
+  
+  // For all other GET requests, serve the React app (let React router handle the routing)
+  app.get('*', (req, res) => {
+    // Skip API routes
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(__dirname, '../build', 'index.html'));
+    } else {
+      // Let API routes fall through to next middleware
+      next();
+    }
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
