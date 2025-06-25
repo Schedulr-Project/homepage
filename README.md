@@ -238,3 +238,44 @@ Open the `simple-test.html` file directly in your browser. This bypasses any Rea
    ```json
    "proxy": "http://localhost:5000"
    ```
+
+## 🚀 Railway Deployment (All-in-One)
+
+To deploy Schedulr (backend + frontend) on [Railway](https://railway.app):
+
+### 1. Build the React Frontend
+From the project root:
+```bash
+npm install           # Install frontend dependencies
+npm run build         # Build React app (outputs to ./build)
+```
+
+### 2. Prepare Backend for Production
+From the project root:
+```bash
+cd backend
+npm install           # Install backend dependencies
+```
+
+### 3. Set Environment Variables
+On Railway, set the following in the dashboard:
+- `MONGODB_URI` (your MongoDB connection string)
+- `JWT_SECRET` (your JWT secret)
+- `NODE_ENV=production`
+- `PORT=5000` (or leave default)
+
+### 4. Deploy to Railway
+- Push your code to GitHub.
+- Create a new Railway project and link your repo.
+- Railway will run `npm install` and `npm start` in `/backend` by default.
+- The backend will serve the React build from `/build` for all non-API routes.
+
+### 5. Access Your App
+- The deployed URL will serve both the API and the React frontend from a single domain.
+
+#### Notes
+- Make sure the React build output (`/build`) is present at the project root before deploying.
+- If you use Railway's "Deploy from GitHub" feature, add a `railway.json` file for custom build steps if needed.
+- No need for a separate frontend deployment (Vercel/Netlify) unless you want to split frontend/backend.
+
+---

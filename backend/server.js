@@ -95,6 +95,22 @@ mongoose
     app.use('/api/classrooms', classroomRoutes);
     
     console.log('All routes registered successfully');
+
+    // Serve React frontend in production
+    if (process.env.NODE_ENV === 'production') {
+      const buildPath = path.join(__dirname, '..', 'build');
+      app.use(express.static(buildPath));
+
+      // Catch-all: send index.html for any route not handled above
+      app.get('*', (req, res) => {
+        // Only serve index.html if the request is not for an API route
+        if (!req.path.startsWith('/api')) {
+          res.sendFile(path.join(buildPath, 'index.html'));
+        } else {
+          res.status(404).json({ error: 'API route not found' });
+        }
+      });
+    }
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err);
