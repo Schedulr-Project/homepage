@@ -72,7 +72,7 @@ If you have problems connecting to MongoDB:
 
 ## Features
 
-- Automated timetable generation for multiple departments
+- Automated timetable generation for multiple departments without conflicts.
 - Intelligent classroom and lab allocation
 - Role-based authentication for admins and faculty
 - Real-time availability of rooms
